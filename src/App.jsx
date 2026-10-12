@@ -127,7 +127,7 @@ const App = () => {
       const fetchCart = async () => {
         const { data, error } = await supabase
           .from("cart_items")
-          .select("quantity, product_id, variant_id, variant_name, price, title, image, category, products(title, price, discount, discount_expiry, stock, thumbnail, image, category, variants)")
+          .select("quantity, product_id, variant_id, variant_name, price, discount, discount_expiry, title, image, category, products(id, title, price, discount, discount_expiry, stock, thumbnail, image, category, variants)")
           .eq("user_id", uid)
 
         if (error) {
@@ -143,6 +143,18 @@ const App = () => {
           const variantObj = (Array.isArray(p.variants) ? p.variants : []).find((v) => v.id === variantId)
           const resolvedImage = variantObj?.image || row.image || p.thumbnail || p.image || ""
 
+          // Stored snapshot values from cart_items table:
+          const storedPrice = Number(row.price != null ? row.price : 0)
+          const storedDiscount = Number(row.discount || 0)
+          const storedDiscountExpiry = row.discount_expiry || ""
+
+          // Live product price:
+          const livePrice = variantId && variantObj?.price != null
+            ? Number(variantObj.price)
+            : (p.price != null ? Number(p.price) : storedPrice)
+          const liveDiscount = Number(p.discount || 0)
+          const liveDiscountExpiry = p.discount_expiry || ""
+
           return {
             id: compoundId,
             compound_id: compoundId,
@@ -150,15 +162,17 @@ const App = () => {
             variant_id: variantId,
             variant_name: row.variant_name || "",
             title: p.title || row.title || "",
-            // Use variant price from cart_items row (already stored correctly on add)
-            price: variantId ? (Number(row.price) || 0) : (Number(p.price) || 0),
+            price: livePrice,
+            storedPrice: storedPrice > 0 ? storedPrice : livePrice,
+            storedDiscount,
+            storedDiscountExpiry,
             quantity: row.quantity,
             image: resolvedImage,
             thumbnail: resolvedImage,
             stock: variantObj?.stock != null ? Number(variantObj.stock) : (p.stock || 0),
             category: p.category || row.category || "general",
-            discount: Number(p.discount || 0),
-            discountExpiry: p.discount_expiry || "",
+            discount: liveDiscount,
+            discountExpiry: liveDiscountExpiry,
           }
         })
 
