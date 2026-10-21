@@ -8,10 +8,10 @@ import { getChannel, setSession, clearSession, broadcastAuth } from "../utils/se
 /**
  * Headless component (renders nothing) that keeps auth state consistent across
  * tabs:
- *  - mirrors the Redux user into this tab's sessionStorage,
- *  - logs this tab out when any other tab broadcasts "logout",
- *  - answers "who" probes so a new tab can detect an existing session and
- *    block a conflicting second login.
+ *  - mirrors the Redux user into this tab's sessionStorage,
+ *  - logs this tab out when any other tab broadcasts "logout",
+ *  - answers "who" probes so a new tab can detect an existing session and
+ *    block a conflicting second login.
  *
  * Mount once, inside the Router/Provider tree (e.g. in App.jsx).
  */

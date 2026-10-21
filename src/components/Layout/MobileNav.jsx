@@ -40,6 +40,8 @@ const ROUTE_TITLES = [
   ["/admin/add-discount", "Add Discount"],
   ["/admin/edit-product", "Edit Product"],
   ["/admin/myorders", "My Orders"],
+  ["/admin/returns", "Returns & Exchanges"],
+  ["/admin/inventory", "Inventory"],
   ["/admin/testing", "Testing"],
   ["/product/", "Product"],
   ["/products", "Products"],
@@ -49,6 +51,8 @@ const ROUTE_TITLES = [
   ["/process-details", "Process"],
   ["/userorders", "Current Orders"],
   ["/userpastorders", "Past Orders"],
+  ["/myreturns", "My Returns"],
+  ["/notifications", "Notifications"],
   ["/order/", "Order Details"],
   ["/myprofile", "My Profile"],
   ["/addresses", "My Addresses"],
@@ -156,6 +160,9 @@ const MobileNav = () => {
       { label: "Billing", path: "/admin/billing" },
       { label: "Optimization", path: "/admin/optimization" },
       { label: "Uploaded Orders", path: "/admin/adminUploadOrders" },
+      { label: "Returns & Exchanges", path: "/admin/returns" },
+      { label: "Inventory", path: "/admin/inventory" },
+      { label: "Notifications", path: "/notifications" },
       { label: "Add Discount", path: "/admin/add-discount" },
       { label: "Edit Profile", path: "/myprofile" },
     ]
@@ -165,6 +172,8 @@ const MobileNav = () => {
       { label: "My Profile", path: "/myprofile" },
       { label: "Current Orders", path: "/userorders" },
       { label: "Past Orders", path: "/userpastorders" },
+      { label: "My Returns", path: "/myreturns" },
+      { label: "Notifications", path: "/notifications" },
       { label: "Edit Profile", path: "/myprofile" },
     ];
 
@@ -210,10 +219,10 @@ const MobileNav = () => {
         </button>
 
         {/* Center: dynamic page title. Intentionally NOT an <h1> — the landing
-            page runs GSAP SplitText.create("h1") which globally splits every
-            <h1> into character spans; that mutates the node outside React and
-            freezes the title on route changes. A span (role=heading) is
-            invisible to that selector. */}
+            page runs GSAP SplitText.create("h1") which globally splits every
+            <h1> into character spans; that mutates the node outside React and
+            freezes the title on route changes. A span (role=heading) is
+            invisible to that selector. */}
         <span
           role="heading"
           aria-level={1}

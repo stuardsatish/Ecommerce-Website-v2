@@ -16,17 +16,17 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 let _admin: SupabaseClient | null = null;
 export function supabaseAdmin(): SupabaseClient {
-  if (_admin) return _admin;
-  _admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  return _admin;
+  if (_admin) return _admin;
+  _admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  return _admin;
 }
 
 export function supabaseForRequest(req: Request): SupabaseClient {
-  const authHeader = req.headers.get("Authorization") || "";
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: authHeader } },
-  });
+  const authHeader = req.headers.get("Authorization") || "";
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: authHeader } },
+  });
 }

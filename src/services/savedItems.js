@@ -3,15 +3,9 @@
 // Mirrors Ecommerce-app/src/services/savedItems.js with web-specific field names.
 import { supabase } from "../context/SupabaseConfig";
 import { upsertCartItem } from "../utils/supabaseCart";
-
-/** Effective selling price for a live product row (discount-expiry aware). */
-const getLivePrice = (product) => {
-  const mrp = Number(product?.price || 0);
-  const disc = Number(product?.discount || 0);
-  if (disc <= 0) return mrp;
-  if (product?.discount_expiry && new Date(product.discount_expiry) < new Date()) return mrp;
-  return mrp - (mrp * disc) / 100;
-};
+import { mapProductRow } from "../utils/supabaseProducts";
+import { optionForVariantId, isAvailable } from "../features/products/purchaseOptions";
+import { savedItemRow } from "./savedItemRow";
 
 const MISSING_CODES = new Set(["PGRST202", "PGRST205", "42883", "42P01"]);
 let warnedMissing = false;
@@ -28,11 +22,16 @@ function warnOnce(err) {
   console.warn("[savedItems] save-for-later backend not available; hiding section.", err?.message || "");
 }
 
-/** DB row → camelCase item matching the web app's cart item shape. */
+/**
+ * DB row → camelCase item matching the web app's cart item shape.
+ * The id follows the CART convention: `${productId}_${variantId}` (variant ids already start with "var_", so the
+ * old `_var_${variantId}` produced "P_var_var_x", which never matched the cart's "P_var_x").
+ */
 function fromRow(row) {
+  const cartId = row.product_id + (row.variant_id ? `_${row.variant_id}` : "");
   return {
-    id: row.product_id + (row.variant_id ? `_var_${row.variant_id}` : ""),
-    compound_id: row.product_id + (row.variant_id ? `_var_${row.variant_id}` : ""),
+    id: cartId,
+    compound_id: cartId,
     productId: row.product_id,
     variant_id: row.variant_id || "",
     variant_name: row.variant_name || "",
@@ -69,22 +68,9 @@ export async function listSavedItems() {
  * @param {function} deleteCartFn — (item) => void, Redux + DB removal
  */
 export async function saveForLater(cartItem, uid, deleteCartFn) {
-  const productId = cartItem.productId || String(cartItem.id || "").split("_var_")[0];
-  const variantId = cartItem.variant_id || "";
-
-  const row = {
-    product_id: productId,
-    variant_id: variantId,
-    variant_name: cartItem.variant_name || "",
-    selected_variant: cartItem.selected_variant || null,
-    quantity: cartItem.quantity || 1,
-    title: cartItem.title || "",
-    image: cartItem.thumbnail || cartItem.image || "",
-    category: cartItem.category || "",
-    price: cartItem.price || 0,
-    discount: cartItem.discount || 0,
-    discount_expiry: cartItem.discountExpiry || null,
-  };
+  // The row must carry user_id (no column default; RLS is user_id = auth.uid()) - see savedItemRow.js.
+  const owner = uid || (await supabase.auth.getSession()).data?.session?.user?.id;
+  const row = savedItemRow(cartItem, owner);
 
   const { error } = await supabase.from("saved_items").upsert(row, {
     onConflict: "user_id,product_id,variant_id",
@@ -104,34 +90,39 @@ export async function saveForLater(cartItem, uid, deleteCartFn) {
  * @returns {{ clamped: boolean, clampedTo?: number }}
  */
 export async function moveSavedToCart(savedItem, uid) {
-  // Fetch live product to check stock + current price
-  const { data: product } = await supabase
+  // Fetch the live product and resolve THE OPTION that was saved (main product or that specific variant): its own
+  // price and stock apply — the old code clamped a variant to the PARENT's stock and priced it at the parent's price.
+  const { data: row } = await supabase
     .from("products")
-    .select("id,stock,price,discount,discount_expiry")
+    .select("*")
     .eq("id", savedItem.productId)
     .maybeSingle();
+  const product = row ? mapProductRow(row) : null;
 
-  const liveStock = product ? Number(product.stock || 0) : null;
-  if (liveStock !== null && liveStock === 0) {
-    throw new Error(`${savedItem.title || "This item"} is out of stock.`);
+  let option = null;
+  if (product) {
+    option = optionForVariantId(product, savedItem.variant_id || "");
+    if (!option) throw new Error(`${savedItem.title || "This item"} is no longer available.`);
+    if (!isAvailable(option)) throw new Error(`${savedItem.title || "This item"} is out of stock.`);
   }
-  const qty = liveStock !== null ? Math.min(savedItem.quantity, liveStock) : savedItem.quantity;
 
-  const livePrice = product ? getLivePrice(product) : savedItem.price;
-  const liveDiscount = product ? (product.discount || 0) : savedItem.discount;
-  const liveExpiry = product ? (product.discount_expiry || null) : savedItem.discountExpiry;
+  // stock === null means "not tracked" (always available)
+  const liveStock = option && option.stock !== null ? Number(option.stock) : null;
+  const qty = liveStock !== null ? Math.min(savedItem.quantity, liveStock) : savedItem.quantity;
 
   await upsertCartItem(uid, {
     productId: savedItem.productId,
     variantId: savedItem.variant_id,
-    variant_name: savedItem.variant_name,
-    selected_variant: savedItem.selected_variant,
+    variant_name: option ? option.name : savedItem.variant_name,
+    selected_variant: option ? option.variant : savedItem.selected_variant,
     title: savedItem.title,
-    image: savedItem.image || savedItem.thumbnail,
+    image: (option && option.image) || savedItem.image || savedItem.thumbnail,
     category: savedItem.category,
-    price: livePrice,
-    discount: liveDiscount,
-    discountExpiry: liveExpiry,
+    // The cart row stores the option's LIST price plus the product-level discount separately (exactly like the product
+    // page does). The old code wrote an already-discounted price AND the discount, i.e. discounted twice.
+    price: option ? option.price : savedItem.price,
+    discount: product ? product.discount : savedItem.discount,
+    discountExpiry: product ? (product.discountExpiry || null) : savedItem.discountExpiry,
   }, qty);
 
   // Remove from saved_items

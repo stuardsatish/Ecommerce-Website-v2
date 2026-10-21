@@ -118,7 +118,7 @@ export default function ProcessDetailsPage() {
                         <img
                             id="headphone"
                             src="/audira-images/donut.png"
-                            //top-[4%]  is the initial position is set to 4 for donut
+                            //top-[4%]  is the initial position is set to 4 for donut
                             // w-[10vw] is the initial size for donut
                             className="absolute left-[34.5%] top-[6%] w-[16vw] max-w-[660px] z-40 origin-center"
                         />
@@ -167,19 +167,19 @@ export default function ProcessDetailsPage() {
                             <img
                                 src="/audira-images/people2.png"
                                 className="absolute max-w-[260px] top-[12%] left-[3%] rotate-[15deg] 
-    border-[10px] border-white rounded-[10px] shadow-[0_0_30px_#73442536]"
+    border-[10px] border-white rounded-[10px] shadow-[0_0_30px_#73442536]"
                             />
 
                             <img
                                 src="/audira-images/people3.png"
                                 className="absolute max-w-[470px] right-[4%] top-[22%] rotate-[14deg] 
-    border-[10px] border-white rounded-[10px] shadow-[0_0_30px_#73442536]"
+    border-[10px] border-white rounded-[10px] shadow-[0_0_30px_#73442536]"
                             />
 
                             <img
                                 src="/audira-images/people4.png"
                                 className="absolute max-w-[340px] left-[10%] bottom-[12%] -rotate-[12deg] 
-    border-[10px] border-white rounded-[10px] shadow-[0_0_30px_#73442536]"
+    border-[10px] border-white rounded-[10px] shadow-[0_0_30px_#73442536]"
                             />
 
                         </section>
@@ -212,14 +212,14 @@ export default function ProcessDetailsPage() {
 
                         {/* <footer className="border-t border-audira-primary flex justify-between items-center py-6 w-[calc(100vw-10rem)] max-w-[1440px] mx-auto">
 
-              <img src="/audira-images/logo.png" className="w-[132px]" />
+              <img src="/audira-images/logo.png" className="w-[132px]" />
 
-              <div className="flex gap-4">
-                <img src="/audira-images/fb.png" className="w-6" />
-                <img src="/audira-images/insta.png" className="w-6" />
-              </div>
+              <div className="flex gap-4">
+                <img src="/audira-images/fb.png" className="w-6" />
+                <img src="/audira-images/insta.png" className="w-6" />
+              </div>
 
-            </footer> */}
+            </footer> */}
 
                     </main>
 

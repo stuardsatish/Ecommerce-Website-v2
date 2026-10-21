@@ -45,8 +45,8 @@
     --color-green: #9D9C3D;
 
     /* (The former ad-hoc design-system tokens --color-brand/ink/body/muted/
-    cream/tint/line have been superseded by the SEMANTIC COLOR TOKENS block
-    below. They were unused as classes/vars, so they were removed.) */
+    cream/tint/line have been superseded by the SEMANTIC COLOR TOKENS block
+    below. They were unused as classes/vars, so they were removed.) */
 
     --color-blue: hsl(222, 50%, 45%);
     --color-pink: hsl(311, 90%, 40%);
@@ -55,20 +55,20 @@
     --color-purple-dark: hsl(277, 98%, 17%);
 
     /* ═══════════════════════════════════════════════════════════════════════
-  SEMANTIC COLOR TOKENS — the app's theming system.
+  SEMANTIC COLOR TOKENS — the app's theming system.
 
-  These declarations do two jobs:
-   1. They make Tailwind v4 generate the utility classes (bg-primary,
-      text-error, border-line-…, ring-accent, from-chart-1, etc.).
-   2. The values here are the DEFAULT-LIGHT fallback. At runtime the
-      ThemeProvider (src/theme/ThemeContext.jsx) injects
-      `:root[data-theme=..][data-mode=..] { --color-*: … }` blocks generated
-      from src/theme/themes.js, which override these per active theme/mode.
+  These declarations do two jobs:
+   1. They make Tailwind v4 generate the utility classes (bg-primary,
+      text-error, border-line-…, ring-accent, from-chart-1, etc.).
+   2. The values here are the DEFAULT-LIGHT fallback. At runtime the
+      ThemeProvider (src/theme/ThemeContext.jsx) injects
+      `:root[data-theme=..][data-mode=..] { --color-*: … }` blocks generated
+      from src/theme/themes.js, which override these per active theme/mode.
 
-   Do NOT hardcode colors in components. Edit palettes in
-      src/theme/themes.js. To add a token, add it here AND in themes.js.
-      See src/theme/README.md.
-  ═══════════════════════════════════════════════════════════════════════ */
+   Do NOT hardcode colors in components. Edit palettes in
+      src/theme/themes.js. To add a token, add it here AND in themes.js.
+      See src/theme/README.md.
+  ═══════════════════════════════════════════════════════════════════════ */
     /* Interactive / brand */
     --color-primary: #A43B31;
     --color-primary-hover: #8A322A;
@@ -89,8 +89,8 @@
     --color-surface-inverse: #1B1C1C;
     --color-overlay: rgba(0, 0, 0, 0.4);
     /* Text / foreground (kept prefix-free so classes read text-ink / text-body /
-    text-muted / text-inverse — and `text-primary` stays free to mean the
-    brand color, e.g. a price). Disabled text uses --color-disabled-fg above. */
+    text-muted / text-inverse — and `text-primary` stays free to mean the
+    brand color, e.g. a price). Disabled text uses --color-disabled-fg above. */
     --color-ink: #1B1C1C;
     --color-body: #44474C;
     --color-muted: #74777D;
@@ -151,10 +151,10 @@ body {
 }
 
 /* Mobile only (<768px): reserve space for the fixed bottom tab bar rendered
- by MobileNav so page content is never hidden behind it. The fixed top
- header occupies the same top zone the old floating navbar did (and is
- shorter), so existing per-page top spacing already clears it. Desktop is
- unaffected — this rule is scoped below the md breakpoint. */
+ by MobileNav so page content is never hidden behind it. The fixed top
+ header occupies the same top zone the old floating navbar did (and is
+ shorter), so existing per-page top spacing already clears it. Desktop is
+ unaffected — this rule is scoped below the md breakpoint. */
 @media (max-width: 767px) {
     body {
         padding-bottom: calc(64px + env(safe-area-inset-bottom));

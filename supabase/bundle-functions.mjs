@@ -41,6 +41,9 @@ function bundle(fnName) {
     const seen = new Set();
     const order = []; // [{ label, code }]
     const external = new Map(); // module -> { named: Map(name -> isTypeOnly), defaultName }
+    // a module written in the plain-JavaScript subset of TypeScript starts with `// @ts-nocheck` (e.g. _shared/refundGateway.ts: its tests also run
+    // in a browser without Node). Inlined into a bundle the comment would no longer be the file's first line, so it is hoisted to the bundle's top.
+    let nocheck = false;
 
     const visit = (file, label) => {
         const abs = path.resolve(file);
@@ -49,6 +52,10 @@ function bundle(fnName) {
         let src = fs.readFileSync(abs, "utf8").replace(/^﻿/, "");
 
         const deps = [];
+        if (/^\s*\/\/\s*@ts-nocheck\b/.test(src)) {
+            nocheck = true;
+            src = src.replace(/^\s*\/\/\s*@ts-nocheck\b[^\r\n]*\r?\n/, "");
+        }
         src = src.replace(IMPORT_RE, (full, typeKw, spec, mod) => {
             if (mod.startsWith(".")) {
                 deps.push(path.resolve(path.dirname(abs), mod));
@@ -99,6 +106,7 @@ function bundle(fnName) {
         `// Paste this whole file as the function's index.ts in the Supabase Dashboard`,
         `// (Edge Functions -> Deploy a new function -> name it "${fnName}").`,
         "// ============================================================================",
+        ...(nocheck ? ["// @ts-nocheck", "// (this bundle contains a module written in the plain-JavaScript subset of TypeScript; the sources under functions/ are type-checked as usual)"] : []),
         ...head,
         "",
     ];

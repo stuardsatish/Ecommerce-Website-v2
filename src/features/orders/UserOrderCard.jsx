@@ -1,5 +1,7 @@
 import { Truck, CheckCircle2, XCircle, RotateCcw, Star } from "lucide-react"
 import { isCodPending } from "../../utils/paymentLabels"
+import { summarizeTracking, trackingHeadline } from "./shipmentModel"
+import { requestSummaryLine } from "../returns/requestModel"
 
 /* Shared between /userorders and /userpastorders.
    Layout matches the reference: 2 columns —
@@ -25,7 +27,7 @@ export const statusMeta = (o) => {
   return { key: "PROCESSING", label: "Processing", bg: "var(--color-info-subtle)", color: "var(--color-info)", icon: "truck" }
 }
 
-export default function UserOrderCard({ order, onBuyAgain, onViewDetails, onReviewClick = () => { }, userReviews = {} }) {
+export default function UserOrderCard({ order, returnRequest = null, onBuyAgain, onViewDetails, onReviewClick = () => { }, userReviews = {} }) {
   const m = statusMeta(order)
   const items = order.products || []
   const thumbs = items.slice(0, 2)
@@ -59,6 +61,17 @@ export default function UserOrderCard({ order, onBuyAgain, onViewDetails, onRevi
             <div className="flex flex-col" style={{ justifyContent: "center" }}>
               <span style={{ fontWeight: 400, fontSize: "14px", color: "var(--color-ink)" }}>{items.length > 1 ? `${items.length} items in total` : (items[0]?.title || "1 item")}</span>
               <span style={{ fontWeight: 500, fontSize: "14px", color: "var(--color-body)" }}>Total: {cur(order.total)}</span>
+              {returnRequest && (
+                <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--color-info)" }}>{requestSummaryLine(returnRequest)}</span>
+              )}
+              {order.orderStatus === "shipped" && (() => {
+                const t = summarizeTracking(order)
+                return (
+                  <span style={{ fontWeight: 600, fontSize: "13px", color: t.needsAttention ? "var(--color-accent-strong)" : "var(--color-info)" }}>
+                    {trackingHeadline(order)}{t.courierName ? ` · ${t.courierName}` : ""}{t.trackingNumber ? ` ${t.trackingNumber}` : ""}
+                  </span>
+                )
+              })()}
               {isCodPending(order) && (
                 <span className="flex items-center" style={{ marginTop: "6px", alignSelf: "flex-start", gap: "4px", fontWeight: 700, fontSize: "11px", letterSpacing: "0.4px", color: "var(--color-accent-strong)", background: "color-mix(in srgb, var(--color-accent-strong) 12%, transparent)", padding: "2px 10px", borderRadius: "9999px" }}>
                   COD · Pay on delivery
@@ -85,7 +98,7 @@ export default function UserOrderCard({ order, onBuyAgain, onViewDetails, onRevi
               </button>
             )}
             <button onClick={() => onViewDetails(order)} className="flex items-center justify-center" style={{ width: "100%", height: "50px", border: "1px solid var(--color-border)", borderRadius: "4px", background: "var(--color-surface)" }}>
-              <span style={{ fontWeight: 600, fontSize: "12px", letterSpacing: "0.6px", textTransform: "uppercase", color: "var(--color-ink)" }}>View Details</span>
+              <span style={{ fontWeight: 600, fontSize: "12px", letterSpacing: "0.6px", textTransform: "uppercase", color: "var(--color-ink)" }}>{m.key === "DELIVERED" ? "View Details / Return" : "View Details"}</span>
             </button>
           </div>
         </div>

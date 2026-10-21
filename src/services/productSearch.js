@@ -12,10 +12,10 @@ import { mapProductRows } from "../utils/supabaseProducts"
  * It falls back to a local substring scan over an already-loaded catalog when
  * the RPC isn't reachable. That matters for two real cases, not just
  * theoretically:
- *   1. The migration is written but not yet applied to the shared project —
- *      search keeps working exactly as it did before, just without typo
- *      tolerance, instead of the page breaking.
- *   2. Any transient network/RPC failure degrades instead of erroring out.
+ *   1. The migration is written but not yet applied to the shared project —
+ *      search keeps working exactly as it did before, just without typo
+ *      tolerance, instead of the page breaking.
+ *   2. Any transient network/RPC failure degrades instead of erroring out.
  *
  * `rpcUnavailable` is latched after the first failure so a missing function
  * costs one round trip per page load rather than one per keystroke.
@@ -44,11 +44,11 @@ const localSearch = (query, catalog, limit) => {
 /**
  * @param {string} query
  * @param {object} [options]
- * @param {Array}  [options.catalog=[]] Already-loaded products, used only by the fallback.
+ * @param {Array}  [options.catalog=[]] Already-loaded products, used only by the fallback.
  * @param {number} [options.limit=20]
  * @returns {Promise<{ results: Array, typoTolerant: boolean }>}
- *          `typoTolerant` reports which path actually ran, so the UI can be
- *          honest about whether fuzzy matching was in play.
+ *          `typoTolerant` reports which path actually ran, so the UI can be
+ *          honest about whether fuzzy matching was in play.
  */
 export const searchProducts = async (query, { catalog = [], limit = 20 } = {}) => {
     const cleaned = String(query || "").trim()

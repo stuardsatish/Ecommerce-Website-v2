@@ -157,12 +157,12 @@ const SignupPage = () => {
             style={{ background: "var(--color-background)", fontFamily: "Inter, sans-serif" }}
         >
             <style>{`
-        .auth-input{width:100%;background:var(--color-surface-muted);border:1px solid transparent;border-radius:12px;padding:12px 14px;font-size:14px;color:var(--color-ink);font-family:'Inter',sans-serif;outline:none;transition:border-color .15s,background .15s;}
-        .auth-input:focus{border-color:var(--color-ink);background:var(--color-surface);}
-        .auth-input::placeholder{color:var(--color-muted);}
-        @keyframes authSpin{to{transform:rotate(360deg);}}
-        .auth-spinner{width:16px;height:16px;border:2px solid color-mix(in srgb, var(--color-inverse) 40%, transparent);border-top-color:var(--color-inverse);border-radius:9999px;animation:authSpin .7s linear infinite;}
-      `}</style>
+        .auth-input{width:100%;background:var(--color-surface-muted);border:1px solid transparent;border-radius:12px;padding:12px 14px;font-size:14px;color:var(--color-ink);font-family:'Inter',sans-serif;outline:none;transition:border-color .15s,background .15s;}
+        .auth-input:focus{border-color:var(--color-ink);background:var(--color-surface);}
+        .auth-input::placeholder{color:var(--color-muted);}
+        @keyframes authSpin{to{transform:rotate(360deg);}}
+        .auth-spinner{width:16px;height:16px;border:2px solid color-mix(in srgb, var(--color-inverse) 40%, transparent);border-top-color:var(--color-inverse);border-radius:9999px;animation:authSpin .7s linear infinite;}
+      `}</style>
 
             <div
                 className="auth-card w-full"
@@ -277,19 +277,19 @@ const SignupPage = () => {
                 </p>
                 {/* Phase 8.2: Guest checkout */}
                 <div className="flex items-center gap-3" style={{ marginTop: "20px" }}>
-                  <div style={{ flex: 1, height: "1px", background: "var(--color-border)" }} />
-                  <span style={{ fontSize: "12px", color: "var(--color-muted)", whiteSpace: "nowrap" }}>or</span>
-                  <div style={{ flex: 1, height: "1px", background: "var(--color-border)" }} />
+                  <div style={{ flex: 1, height: "1px", background: "var(--color-border)" }} />
+                  <span style={{ fontSize: "12px", color: "var(--color-muted)", whiteSpace: "nowrap" }}>or</span>
+                  <div style={{ flex: 1, height: "1px", background: "var(--color-border)" }} />
                 </div>
                 <button
-                  type="button"
-                  onClick={handleGuestCheckout}
-                  disabled={guestBusy || loading}
-                  className="flex items-center justify-center gap-2 w-full"
-                  style={{ marginTop: "12px", padding: "12px", borderRadius: "9999px", border: "1px solid var(--color-border-strong)", fontSize: "15px", fontWeight: 600, color: "var(--color-body)", background: "transparent", cursor: (guestBusy || loading) ? "not-allowed" : "pointer", opacity: (guestBusy || loading) ? 0.6 : 1 }}
+                  type="button"
+                  onClick={handleGuestCheckout}
+                  disabled={guestBusy || loading}
+                  className="flex items-center justify-center gap-2 w-full"
+                  style={{ marginTop: "12px", padding: "12px", borderRadius: "9999px", border: "1px solid var(--color-border-strong)", fontSize: "15px", fontWeight: 600, color: "var(--color-body)", background: "transparent", cursor: (guestBusy || loading) ? "not-allowed" : "pointer", opacity: (guestBusy || loading) ? 0.6 : 1 }}
                 >
-                  {guestBusy ? <span className="auth-spinner" /> : null}
-                  Continue as Guest
+                  {guestBusy ? <span className="auth-spinner" /> : null}
+                  Continue as Guest
                 </button>
             </div>
         </div>

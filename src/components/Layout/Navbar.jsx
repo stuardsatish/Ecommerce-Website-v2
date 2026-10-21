@@ -20,6 +20,7 @@ import { assets } from "../../assets/assets";
 import useIsMobile from "../../hooks/useIsMobile";
 import { broadcastAuth, clearSession } from "../../utils/sessionUtils";
 import { clearLocalSession } from "../../utils/sessionManager";
+import NotificationBell from "../../features/notifications/NotificationBell";
 
 /** Capitalise the first letter of a display name (e.g. "john" → "John"). */
 const capitalize = (s) => {
@@ -39,6 +40,10 @@ const ROUTE_BG = {
   "/admin/testing": "var(--color-surface-inverse)",
   "/admin/add-product": "var(--color-surface-muted)",
   "/admin/myorders": "var(--color-background)",
+  "/admin/returns": "var(--color-background)",
+  "/admin/inventory": "var(--color-background)",
+  "/myreturns": "var(--color-background)",
+  "/notifications": "var(--color-background)",
   "/admin/users": "var(--color-background)",
   "/admin/createOrders": "var(--color-background)",
   "/admin/billing": "var(--color-surface-muted)",
@@ -234,7 +239,7 @@ const Navbar = () => {
   return (
     <>
       {/* Top sensing area to trigger hover-to-show when navbar is hidden.
-          Desktop only — the mobile shell (MobileNav) replaces the navbar below md. */}
+          Desktop only — the mobile shell (MobileNav) replaces the navbar below md. */}
       <div
         className={`hidden md:block fixed top-0 left-0 w-full h-8 z-[55] cursor-pointer ${navHidden ? "hidden" : ""}`}
         onMouseEnter={() => setIsHovering(true)}
@@ -299,6 +304,9 @@ const Navbar = () => {
                   </span>
                 </button>
 
+                {/* Notifications (customers and admins): unread count, opens /notifications */}
+                {user && <NotificationBell color={navText} />}
+
                 {user && !isAdmin && (
                   <>
                     <button
@@ -359,12 +367,14 @@ const Navbar = () => {
                       {user && user.role === "admin" ? (
                         <>
                           <NavLink to="/admin/users" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Users</NavLink>
-                          <NavLink to="/admin/add-product" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Add Product</NavLink>
+                          <NavLink to="/admin/add-product" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Products</NavLink>
                           <NavLink to="/admin/createOrders" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">WhatsApp Order</NavLink>
                           <NavLink to="/admin/billing" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Billing</NavLink>
                           <NavLink to="/admin/optimization" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Optimization</NavLink>
                           <NavLink to="/admin/adminUploadOrders" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Upload Orders</NavLink>
                           <NavLink to="/admin/myorders" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">My Orders</NavLink>
+                          <NavLink to="/admin/returns" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Returns &amp; Exchanges</NavLink>
+                          <NavLink to="/admin/inventory" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Inventory</NavLink>
                           <NavLink to="/admin/add-discount" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Add Discount</NavLink>
                           <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-error hover:bg-error-subtle border-t border-ink/5">Logout</button>
                         </>
@@ -373,6 +383,7 @@ const Navbar = () => {
                           <NavLink to="/myprofile" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">My Profile</NavLink>
                           <NavLink to="/userorders" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Current Orders</NavLink>
                           <NavLink to="/userpastorders" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Past Orders</NavLink>
+                          <NavLink to="/myreturns" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">My Returns</NavLink>
                           {/* <NavLink to="/wishlist" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-ink hover:bg-surface-inverse/5">Wishlist</NavLink> */}
                           <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-error hover:bg-error-subtle border-t border-ink/5">Logout</button>
                         </>
@@ -384,6 +395,7 @@ const Navbar = () => {
 
               {/* ── MOBILE: Action icons + Hamburger ── */}
               <div className="flex md:hidden items-center gap-3">
+                {user && <NotificationBell size={18} className="relative text-ink min-w-[44px] min-h-[44px] flex items-center justify-center" badgeClassName="absolute top-1 right-1" />}
                 {user && !isAdmin && (
                   <>
                     <button
@@ -488,6 +500,9 @@ const Navbar = () => {
                     <button onClick={() => handleDrawerNav("/admin/optimization")} className={drawerItemClass("/admin/optimization")}>Optimization</button>
                     <button onClick={() => handleDrawerNav("/admin/adminUploadOrders")} className={drawerItemClass("/admin/adminUploadOrders")}>Upload Orders</button>
                     <button onClick={() => handleDrawerNav("/admin/myorders")} className={drawerItemClass("/admin/myorders")}>My Orders</button>
+                    <button onClick={() => handleDrawerNav("/admin/returns")} className={drawerItemClass("/admin/returns")}>Returns &amp; Exchanges</button>
+                    <button onClick={() => handleDrawerNav("/admin/inventory")} className={drawerItemClass("/admin/inventory")}>Inventory</button>
+                    <button onClick={() => handleDrawerNav("/notifications")} className={drawerItemClass("/notifications")}>Notifications</button>
                     <button onClick={() => handleDrawerNav("/admin/add-discount")} className={drawerItemClass("/admin/add-discount")}>Add Discount</button>
                   </>
                 ) : (
@@ -495,6 +510,8 @@ const Navbar = () => {
                     <button onClick={() => handleDrawerNav("/myprofile")} className={drawerItemClass("/myprofile")}>My Profile</button>
                     <button onClick={() => handleDrawerNav("/userorders")} className={drawerItemClass("/userorders")}>Current Orders</button>
                     <button onClick={() => handleDrawerNav("/userpastorders")} className={drawerItemClass("/userpastorders")}>Past Orders</button>
+                    <button onClick={() => handleDrawerNav("/myreturns")} className={drawerItemClass("/myreturns")}>My Returns</button>
+                    <button onClick={() => handleDrawerNav("/notifications")} className={drawerItemClass("/notifications")}>Notifications</button>
                     <button onClick={() => handleDrawerNav("/wishlist")} className={drawerItemClass("/wishlist")}>Wishlist</button>
                   </>
                 )}

@@ -9,6 +9,7 @@ import { supabase } from "../../context/SupabaseConfig";
 import { upsertCartItem, decrementOrRemoveCartItem, nextAddQuantity, nextRemoveQuantity } from "../../utils/supabaseCart";
 import { addWishlistItem, removeWishlistItem } from "../../utils/supabaseWishlist";
 import { formatCurrency } from "../../utils/pricing";
+import { listPriceSummary, listStockSummary, needsOptionChoice } from "./purchaseOptions";
 
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 
@@ -25,9 +26,15 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
 
     const productId = String(product.id);
 
-    const stock = product.stock || 0;
+    // Phase 1/4: availability and price describe the WHOLE product (every purchasable option), not only the main counter.
+    // See purchaseOptions.js: listStockSummary / listPriceSummary / needsOptionChoice.
+    const stockInfo = listStockSummary(product);
+    const summary = listPriceSummary(product);
+    const choose = needsOptionChoice(product); // the card cannot "add the product": the shopper must pick an option first
+    const showCount = !stockInfo.out && stockInfo.units != null && !stockInfo.multi; // a number only when ONE tracked option exists
+    const stock = stockInfo.out ? 0 : (stockInfo.units ?? 999999);
 
-    const isOutOfStock = stock <= 0;
+    const isOutOfStock = stockInfo.out;
 
     const isWishlisted = wishlistItems.some(
         (item) => String(item.id) === productId,
@@ -36,8 +43,8 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
     const existingItem = cartItems.find(
         (item) => String(item.id) === productId,
     ); /* =========================
-       FETCH PRODUCT RATINGS
-    ========================= */
+       FETCH PRODUCT RATINGS
+    ========================= */
 
     useEffect(() => {
         const fetchRatings = async () => {
@@ -71,8 +78,8 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
 
         fetchRatings();
     }, [productId]); /* =========================
-       WISHLIST TOGGLE
-    ========================= */
+       WISHLIST TOGGLE
+    ========================= */
 
     const handleWishlist = async (e) => {
         e.stopPropagation();
@@ -123,12 +130,12 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
         dispatch(removeCart(productId));
         decrementOrRemoveCartItem(user?.uid, productId, qty);
     }; /* =========================
-       MOBILE VARIANT (≤640px)
-       Shares all hooks/handlers above; only the layout differs.
-    ========================= */
+       MOBILE VARIANT (≤640px)
+       Shares all hooks/handlers above; only the layout differs.
+    ========================= */
 
     if (variant === "mobile") {
-        const priceLabel = formatCurrency(product.price); // was a hardcoded `$`
+        const priceLabel = `${summary.prefix ? summary.prefix + " " : ""}${formatCurrency(summary.price)}`; // was a hardcoded `$`
 
         // Stock badge derived from the existing numeric `stock` field
 
@@ -137,7 +144,7 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
             stockText = "Out of Stock";
             stockColor = "var(--color-primary)";
             stockItalic = true;
-        } else if (stock <= 5) {
+        } else if (showCount && stock <= 5) {
             stockText = `${stock} left`;
             stockColor = "var(--color-primary)";
             stockItalic = false;
@@ -160,7 +167,7 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                     fontFamily: "Inter, sans-serif",
                 }}
             >
-                {/* WISHLIST BUTTON */}               {" "}
+                {/* WISHLIST BUTTON */}               {" "}
                 <button
                     onClick={handleWishlist}
                     aria-label="Toggle wishlist"
@@ -206,9 +213,9 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                     </div>
                     {" "}
                 </div>
-                {/* CONTENT AREA */}               {" "}
+                {/* CONTENT AREA */}               {" "}
                 <div className="flex flex-col flex-1" style={{ padding: "12px" }}>
-                    {/* Top cluster */}                   {" "}
+                    {/* Top cluster */}                   {" "}
                     <div onClick={goToProduct} className="cursor-pointer">
                         {" "}
                         <p
@@ -240,7 +247,7 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                             {product.title}
                             {" "}
                         </h3>
-                        {/* Rating row */}                       {" "}
+                        {/* Rating row */}                       {" "}
                         <div
                             className="flex items-center"
                             style={{ marginTop: "6px", gap: "4px" }}
@@ -309,6 +316,11 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                             </span>
                             {" "}
                         </div>
+                        {summary.note && (
+                            <p style={{ color: "var(--color-muted)", fontSize: "11px", marginBottom: "8px" }}>
+                                {summary.note}
+                            </p>
+                        )}
                         {/* CTA — keeps existing cart handlers */}
                         {" "}
                         {isOutOfStock ? (
@@ -329,6 +341,23 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                             >
                                 Out of Stock
                                 {" "}
+                            </button>
+                        ) : choose ? (
+                            <button
+                                onClick={goToProduct}
+                                className="w-full flex items-center justify-center"
+                                style={{
+                                    height: "36px",
+                                    borderRadius: "9999px",
+                                    background: "var(--color-primary)",
+                                    color: "var(--color-inverse)",
+                                    fontWeight: 700,
+                                    fontSize: "12px",
+                                    letterSpacing: "0.6px",
+                                    textTransform: "uppercase",
+                                }}
+                            >
+                                Choose options
                             </button>
                         ) : existingItem ? (
                             <div
@@ -431,7 +460,7 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                     )}
                     {" "}
                 </button>
-                {/* Clickable Navigation Wrapper */}               {" "}
+                {/* Clickable Navigation Wrapper */}               {" "}
                 <div
                     onClick={() =>
                         navigate(`/product/${productId}`, { state: { product } })
@@ -450,13 +479,13 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                         />
                         {" "}
                     </div>
-                    {/* Text Content */}                   {" "}
+                    {/* Text Content */}                   {" "}
                     <div className="p-3 flex flex-col flex-1 bg-surface relative">
                         {" "}
                         <div className="absolute right-3 -top-5 bg-surface-inverse px-3 py-1.5 rounded-full shadow-lg">
                             {" "}
                             <span className="font-bold text-inverse tracking-wide text-xs">
-                                ₹{product.price}
+                                {summary.prefix ? `${summary.prefix} ` : ""}₹{summary.price}
                             </span>
                             {" "}
                         </div>
@@ -470,6 +499,9 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                             {product.title}
                             {" "}
                         </h3>
+                        {summary.note && (
+                            <p className="text-[11px] text-muted mb-1">{summary.note}</p>
+                        )}
                         {/* RATING & STOCK */}
                         {" "}
                         <div className="flex items-center justify-between mt-auto">
@@ -501,13 +533,13 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                             <div
                                 className={`font-black uppercase tracking-tighter px-2 py-0.5 rounded-md text-[10px] ${isOutOfStock
                                         ? "bg-error-subtle text-error"
-                                        : stock <= 5
+                                        : showCount && stock <= 5
                                             ? "bg-error-subtle text-error"
                                             : "bg-surface-muted text-muted"
                                     }`}
                             >
                                 {" "}
-                                {isOutOfStock ? "out of stock" : `${stock} QTY Available`}
+                                {isOutOfStock ? "out of stock" : showCount ? `${stock} QTY Available` : "in stock"}
                                 {" "}
                             </div>
                             {" "}
@@ -528,6 +560,13 @@ export const ProductCard = ({ product, variant = "desktop" }) => {
                         >
                             Out of Stock
                             {" "}
+                        </button>
+                    ) : choose ? (
+                        <button
+                            onClick={() => navigate(`/product/${productId}`, { state: { product } })}
+                            className="w-full rounded-xl py-3 text-inverse font-semibold text-sm transition-all shadow-md hover:shadow-lg cursor-pointer min-h-[44px] bg-surface-inverse hover:bg-surface-inverse hover:-translate-y-0.5"
+                        >
+                            Choose options
                         </button>
                     ) : existingItem ? (
                         <div className="flex items-center justify-between bg-surface border-2 border-ink rounded-xl overflow-hidden shadow-sm">

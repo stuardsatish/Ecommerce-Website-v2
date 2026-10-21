@@ -16,6 +16,7 @@ import { addWishlist, removeWishlist } from "../../context/WishlistSlice";
 import { ProductCard } from "../../features/products/ProductCard";
 import { ProductCardSkeleton } from "../../features/products/ProductCardSkeleton";
 import { NewProductCardSkeleton } from "../../features/products/NewProductCardSkeleton";
+import { listPriceSummary, listStockSummary, needsOptionChoice } from "../../features/products/purchaseOptions";
 import FiltersSidebar from "../../features/products/FiltersSidebar";
 import useIsMobile from "../../hooks/useIsMobile";
 import {
@@ -69,7 +70,10 @@ const getImage = (p) =>
     p.thumbnail ||
     p.image ||
     "https://picsum.photos/seed/" + (p.id || "x") + "/400/400";
-const getMrp = (p) => Number(p.price || 0); // price = MRP
+// price = MRP. For a product with variants this is the price the CARD shows (listPriceSummary): the MAIN price when the
+// main product is on sale, otherwise the lowest variant price (the card then says "From" and explains the range).
+// Sorting and price filters use the same number, so what you filter by is what you see.
+const getMrp = (p) => listPriceSummary(p).price;
 const getDiscount = (p) => {
     if (p.discountExpiry) {
         const expiry = new Date(p.discountExpiry).getTime();
@@ -84,7 +88,12 @@ const getPrice = (p) => {
 
     return mrp - (mrp * discount) / 100;
 };
-const getStock = (p) => Number(p.stock || 0);
+// Units that can be bought across ALL options of the product (0 = nothing can be bought; untracked = unlimited -> big cap).
+// A sold-out MAIN counter must not hide variants that are in stock (see listStockSummary).
+const getStock = (p) => {
+    const s = listStockSummary(p);
+    return s.out ? 0 : (s.units ?? 999999);
+};
 const getMaxStock = (p) =>
     Number(p.maxStock || 0) || Math.max(getStock(p), 100);
 
@@ -119,8 +128,13 @@ const NewProductCard = ({
     const stock = getStock(product);
     const maxStock = getMaxStock(product);
     const pct = Math.max(0, Math.min(100, Math.round((stock / maxStock) * 100)));
-    const isLow = pct <= 20;
-    const isOut = stock <= 0;
+    // Phase 1/4: explicit price + availability rules for products with variants
+    const summary = listPriceSummary(product);
+    const stockInfo = listStockSummary(product);
+    const choose = needsOptionChoice(product); // card cannot "add the product": shopper must pick an option
+    const showCount = !stockInfo.out && stockInfo.units != null && !stockInfo.multi; // a number only for ONE tracked option
+    const isLow = showCount && pct <= 20;
+    const isOut = stockInfo.out;
 
     return (
         <div data-pid={product.id} className="product-card flex flex-col bg-surface border border-[var(--color-border-strong)] rounded-xl overflow-hidden shadow-[0px_4px_12px_rgba(0,0,0,0.05)]">
@@ -189,6 +203,9 @@ const NewProductCard = ({
                     {discount > 0 ? (
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">
+                                {summary.prefix && (
+                                    <span className="text-[11px] font-semibold text-muted">{summary.prefix}</span>
+                                )}
                                 <span className="text-[16px] font-bold text-[var(--color-primary)]">
                                     ₹{discountedPrice.toFixed(2)}
                                 </span>
@@ -209,8 +226,14 @@ const NewProductCard = ({
                         </div>
                     ) : (
                         <span className="text-[16px] font-bold text-[var(--color-primary)]">
+                            {summary.prefix && (
+                                <span className="text-[11px] font-semibold text-muted mr-1">{summary.prefix}</span>
+                            )}
                             ₹{mrp.toFixed(2)}
                         </span>
+                    )}
+                    {summary.note && (
+                        <div className="text-[11px] text-muted mt-1">{summary.note}</div>
                     )}
                 </div>
 
@@ -223,20 +246,22 @@ const NewProductCard = ({
                                 : { background: "var(--color-success-subtle)", color: "var(--color-success)" }
                         }
                     >
-                        {isOut ? "Out of Stock" : `Available: ${stock}`}
+                        {isOut ? "Out of Stock" : showCount ? `Available: ${stock}` : "In Stock"}
                     </span>
-                    <div
-                        className="rounded-full overflow-hidden"
-                        style={{ width: "70px", height: "5px", background: "var(--color-border)" }}
-                    >
+                    {showCount && (
                         <div
-                            className="h-full rounded-full"
-                            style={{
-                                width: `${pct}%`,
-                                background: isLow ? "var(--color-error)" : "var(--color-success)",
-                            }}
-                        />
-                    </div>
+                            className="rounded-full overflow-hidden"
+                            style={{ width: "70px", height: "5px", background: "var(--color-border)" }}
+                        >
+                            <div
+                                className="h-full rounded-full"
+                                style={{
+                                    width: `${pct}%`,
+                                    background: isLow ? "var(--color-error)" : "var(--color-success)",
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className="mt-auto">
@@ -251,6 +276,18 @@ const NewProductCard = ({
                             }}
                         >
                             Out of Stock
+                        </button>
+                    ) : choose ? (
+                        <button
+                            onClick={() => navigate(`/product/${product.id}`, { state: { product } })}
+                            className="w-full flex items-center justify-center gap-2 rounded-lg font-bold text-[13px]"
+                            style={{
+                                height: "40px",
+                                background: "var(--color-primary)",
+                                color: "var(--color-inverse)",
+                            }}
+                        >
+                            Choose options
                         </button>
                     ) : quantity > 0 ? (
                         <div
@@ -454,14 +491,14 @@ const ProductsPage = () => {
                 (selectedCategories.length
                     ? selectedCategories.includes(product.category)
                     : true) &&
-                product.price >= minPrice &&
+                getMrp(product) >= minPrice &&
                 Number(product.rating || 0) >= minRating &&
                 product.title?.toLowerCase().includes(search.toLowerCase())
             );
         });
 
-        if (sort === "priceLow") filtered.sort((a, b) => a.price - b.price);
-        else if (sort === "priceHigh") filtered.sort((a, b) => b.price - a.price);
+        if (sort === "priceLow") filtered.sort((a, b) => getMrp(a) - getMrp(b));
+        else if (sort === "priceHigh") filtered.sort((a, b) => getMrp(b) - getMrp(a));
         else if (sort === "rating")
             filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
@@ -582,7 +619,7 @@ const ProductsPage = () => {
     // MAX PRICE FOR FILTER
     const maxPriceValue = useMemo(() => {
         if (products.length === 0) return 2000;
-        return Math.max(...products.map((p) => Number(p.price || 0)));
+        return Math.max(...products.map((p) => getMrp(p)));
     }, [products]);
 
     // MOBILE: total cart count (drives the app-bar badge + bottom-nav dot)

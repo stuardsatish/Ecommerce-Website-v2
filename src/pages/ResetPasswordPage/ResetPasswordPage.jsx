@@ -93,12 +93,12 @@ const ResetPasswordPage = () => {
             }}
         >
             <style>{`
-        .auth-input{width:100%;background:var(--color-surface-muted);border:1px solid transparent;border-radius:12px;padding:12px 14px;font-size:14px;color:var(--color-ink);font-family:'Inter',sans-serif;outline:none;transition:border-color .15s,background .15s;}
-        .auth-input:focus{border-color:var(--color-ink);background:var(--color-surface);}
-        .auth-input::placeholder{color:var(--color-muted);}
-        @keyframes authSpin{to{transform:rotate(360deg);}}
-        .auth-spinner{width:16px;height:16px;border:2px solid color-mix(in srgb, var(--color-inverse) 40%, transparent);border-top-color:var(--color-inverse);border-radius:9999px;animation:authSpin .7s linear infinite;}
-      `}</style>
+        .auth-input{width:100%;background:var(--color-surface-muted);border:1px solid transparent;border-radius:12px;padding:12px 14px;font-size:14px;color:var(--color-ink);font-family:'Inter',sans-serif;outline:none;transition:border-color .15s,background .15s;}
+        .auth-input:focus{border-color:var(--color-ink);background:var(--color-surface);}
+        .auth-input::placeholder{color:var(--color-muted);}
+        @keyframes authSpin{to{transform:rotate(360deg);}}
+        .auth-spinner{width:16px;height:16px;border:2px solid color-mix(in srgb, var(--color-inverse) 40%, transparent);border-top-color:var(--color-inverse);border-radius:9999px;animation:authSpin .7s linear infinite;}
+      `}</style>
             <div
                 className="auth-card w-full"
                 style={{

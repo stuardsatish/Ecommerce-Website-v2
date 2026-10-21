@@ -29,7 +29,7 @@ const buildPages = (page, totalPages) => {
  * @param {(p:number)=>void} props.onPageChange
  * @param {(s:number)=>void} [props.onPageSizeChange]
  * @param {number[]} [props.pageSizeOptions=[10,25,50]]
- * @param {string}  [props.accent="var(--color-primary)"]
+ * @param {string}  [props.accent="var(--color-primary)"]
  */
 export default function Pagination({
     total,

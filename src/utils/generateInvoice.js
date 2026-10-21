@@ -4,9 +4,9 @@ import { getInvoiceSettings } from "../services/settingsService"
 
 /**
  * @typedef {Object} OrderProduct
- * @property {string} [title]    Product name
- * @property {string} [sku]      SKU / item code
- * @property {number} [price]    Unit price (GST-inclusive)
+ * @property {string} [title]    Product name
+ * @property {string} [sku]      SKU / item code
+ * @property {number} [price]    Unit price (GST-inclusive)
  * @property {number} [quantity] Quantity ordered
  * @property {string} [category] Product category
  */
@@ -23,7 +23,7 @@ import { getInvoiceSettings } from "../services/settingsService"
  * @property {number} [total]
  * @property {string} [paymentMethod]
  * @property {string} [paymentStatus]
- * @property {*}      [createdAt]   Firestore Timestamp | ISO string | Date
+ * @property {*}      [createdAt]   Firestore Timestamp | ISO string | Date
  * @property {OrderProduct[]} [products]
  */
 
@@ -95,8 +95,8 @@ const loadImage = (url) => {
  * Generate and download a professional A4 PDF tax invoice for an order,
  * fully client-side. Safe to call from both user and admin pages.
  *
- * @param {Order} order               The order document.
- * @param {Object} [userDetails={}]   Optional customer details ({name,email,phone,address,state}).
+ * @param {Order} order               The order document.
+ * @param {Object} [userDetails={}]   Optional customer details ({name,email,phone,address,state}).
  * @returns {Promise<void>}
  */
 export async function generateInvoice(order, userDetails = {}) {
@@ -291,7 +291,7 @@ export async function generateInvoice(order, userDetails = {}) {
     if (phone) contactParts.push(phone);
     if (website) contactParts.push(website);
     if (contactParts.length > 0) {
-        doc.text(contactParts.join("  |  "), M, textY);
+        doc.text(contactParts.join("  |  "), M, textY);
         textY += 14;
     }
 

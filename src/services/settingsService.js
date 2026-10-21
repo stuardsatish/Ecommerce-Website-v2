@@ -120,6 +120,21 @@ export const saveShippingSettings = async (settings) => {
 };
 
 /**
+ * Store-wide return / exchange DEFAULTS (settings row id='returnPolicyDefaults', seeded 7 / 7 by migration 20261014_01).
+ * They only PRE-FILL new products and bulk imports and feed the static policy pages; the policy of each product lives on the
+ * product, and an order keeps the policy it was bought with. Returns the stored document, or null when the row is missing.
+ */
+export const getReturnPolicyDefaults = async () => getSettingsData("returnPolicyDefaults");
+
+/**
+ * Saves the defaults document built by productForm.policyToSettings(). The database re-validates it
+ * (migration 20261017_01: windows 1..365 while enabled, none while disabled) and answers errcode 22023 otherwise.
+ */
+export const saveReturnPolicyDefaults = async (doc) => {
+    await upsertSettingsData("returnPolicyDefaults", doc);
+};
+
+/**
  * Reads GST settings from the settings row id='gstSettings'.
  * Defaults to { gstEnabled: true } so existing behaviour is preserved
  * for stores that have never touched this setting.

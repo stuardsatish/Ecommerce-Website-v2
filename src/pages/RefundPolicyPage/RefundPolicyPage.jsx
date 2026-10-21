@@ -1,18 +1,23 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import LegalPageLayout, { LegalSection } from "../../components/Common/LegalPageLayout"
-import { getInvoiceSettings } from "../../services/settingsService"
+import { getInvoiceSettings, getReturnPolicyDefaults } from "../../services/settingsService"
+import { returnPolicyCopy } from "../../features/products/policyCopy"
 
 const RefundPolicyPage = () => {
     const [settings, setSettings] = useState(null)
+    const [policyDoc, setPolicyDoc] = useState(null)
 
     useEffect(() => {
         let active = true
         getInvoiceSettings().then((data) => active && setSettings(data)).catch(() => { })
+        // the return window is a STORE setting (Admin > Optimization), not a number in this file; each product shows its own
+        getReturnPolicyDefaults().then((data) => active && setPolicyDoc(data)).catch(() => { })
         return () => { active = false }
     }, [])
 
     const supportEmail = settings?.supportEmail || settings?.email || ""
     const supportPhone = settings?.supportPhone || settings?.mobile || ""
+    const copy = useMemo(() => returnPolicyCopy(policyDoc), [policyDoc])
 
     return (
         <LegalPageLayout title="Refund Policy" lastUpdated="October 2026">
@@ -24,11 +29,14 @@ const RefundPolicyPage = () => {
                 </p>
             </LegalSection>
             <LegalSection title="Returns">
-                <p>
-                    If something arrives damaged, incorrect, or not as described, contact us within 7 days of
-                    delivery with your order number and we'll arrange a replacement or refund. Items should be
-                    unused and in their original packaging where possible.
-                </p>
+                {copy.returns.map((text, i) => (
+                    <p key={i} className={i > 0 ? "mt-3" : ""}>{text}</p>
+                ))}
+            </LegalSection>
+            <LegalSection title="Exchanges">
+                {copy.exchanges.map((text, i) => (
+                    <p key={i} className={i > 0 ? "mt-3" : ""}>{text}</p>
+                ))}
             </LegalSection>
             <LegalSection title="Refund timing">
                 <p>

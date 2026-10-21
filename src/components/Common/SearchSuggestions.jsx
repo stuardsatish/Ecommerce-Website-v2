@@ -6,12 +6,12 @@ import { Search, Clock, X, SlidersHorizontal } from "lucide-react"
  * `components/SearchSuggestions.jsx`).
  *
  * Two modes, chosen by whether anything has been typed:
- *   - empty query → the user's own recent searches, each removable, plus a
- *     "Clear all". Renders nothing at all when there's no history, so the
- *     caller just shows no dropdown on a first visit.
- *   - non-empty query → matching categories first (they narrow the most), then
- *     product hits from `results` (server-side pg_trgm matches when the RPC is
- *     available, local substring matches otherwise).
+ *   - empty query → the user's own recent searches, each removable, plus a
+ *     "Clear all". Renders nothing at all when there's no history, so the
+ *     caller just shows no dropdown on a first visit.
+ *   - non-empty query → matching categories first (they narrow the most), then
+ *     product hits from `results` (server-side pg_trgm matches when the RPC is
+ *     available, local substring matches otherwise).
  *
  * Positioning is the caller's job: this renders an absolutely-positioned panel
  * and expects to sit inside a `position: relative` wrapper around the input.

@@ -167,7 +167,7 @@ const toVote = (row) => ({
 /**
  * Vote totals (+ the caller's own vote) for every review of a product.
  * @returns {Promise<Record<string,{helpfulCount:number,unhelpfulCount:number,myVote:number}>|null>}
- *   keyed by review id; `null` when the backend feature isn't there.
+ *   keyed by review id; `null` when the backend feature isn't there.
  */
 export async function fetchReviewVotes(productId) {
     const { data, error } = await supabase.rpc("review_vote_summary", { p_product_id: String(productId) })
@@ -220,8 +220,8 @@ const toQuestion = (q) => ({
 /**
  * Questions (newest first, answers nested) plus what this visitor may do.
  * @returns {Promise<{ available:boolean, permissions:{canAsk:boolean,canAnswer:boolean,isStaff:boolean},
- *   questions:Array<{id:string,question:string,createdAt:string,asker:string,isMine:boolean,
- *   answers:Array<{id:string,answer:string,createdAt:string,answerer:string,isStaff:boolean,isMine:boolean}>}> }>}
+ *   questions:Array<{id:string,question:string,createdAt:string,asker:string,isMine:boolean,
+ *   answers:Array<{id:string,answer:string,createdAt:string,answerer:string,isStaff:boolean,isMine:boolean}>}> }>}
  */
 export async function fetchProductQA(productId, limit = 30) {
     const pid = String(productId)

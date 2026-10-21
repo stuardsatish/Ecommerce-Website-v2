@@ -4,6 +4,8 @@
 // Paste this whole file as the function's index.ts in the Supabase Dashboard
 // (Edge Functions -> Deploy a new function -> name it "payment-verify").
 // ============================================================================
+// @ts-nocheck
+// (this bundle contains a module written in the plain-JavaScript subset of TypeScript; the sources under functions/ are type-checked as usual)
 import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
 import Razorpay from "npm:razorpay@2.9.4";
 
@@ -15,118 +17,118 @@ import Razorpay from "npm:razorpay@2.9.4";
 // so none of them ship without these protections.
 
 const DEFAULT_ORIGINS = [
-    "https://e-commerce-demo-website1.web.app",
-    "https://my-sweet-bec4a.web.app",
-    "http://localhost:5173",
+  "https://e-commerce-demo-website1.web.app",
+  "https://my-sweet-bec4a.web.app",
+  "http://localhost:5173",
 ];
 
 function allowedOrigins(): string[] {
-    const env = Deno.env.get("ALLOWED_ORIGINS");
-    if (!env) return DEFAULT_ORIGINS;
-    return env.split(",").map((s) => s.trim()).filter(Boolean);
+  const env = Deno.env.get("ALLOWED_ORIGINS");
+  if (!env) return DEFAULT_ORIGINS;
+  return env.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
 function isOriginAllowed(origin: string): boolean {
-    if (!origin) return true;
-    const list = allowedOrigins();
-    if (list.includes("*") || list.includes(origin)) return true;
-    try {
-        const url = new URL(origin);
-        if (url.hostname.endsWith(".vercel.app") || url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-            return true;
-        }
-    } catch (_) { }
-    return false;
+  if (!origin) return true;
+  const list = allowedOrigins();
+  if (list.includes("*") || list.includes(origin)) return true;
+  try {
+    const url = new URL(origin);
+    if (url.hostname.endsWith(".vercel.app") || url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      return true;
+    }
+  } catch (_) { }
+  return false;
 }
 
 /** Security headers ported from index.js's helmet() config. */
 const SECURITY_HEADERS: Record<string, string> = {
-    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    "Cross-Origin-Resource-Policy": "same-site",
-    "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
-    "Referrer-Policy": "no-referrer",
+  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Cross-Origin-Resource-Policy": "same-site",
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  "Referrer-Policy": "no-referrer",
 };
 
 /**
- * Resolve the CORS header set for this request's Origin. No Origin header
- * (native app / server-to-server / curl) is allowed through, same as the
- * original `cors()` config. An Origin present but not on the allow-list gets
- * no `Access-Control-Allow-Origin` header, which makes the browser block the
- * response client-side (equivalent to the Express CORS error path).
- */
+ * Resolve the CORS header set for this request's Origin. No Origin header
+ * (native app / server-to-server / curl) is allowed through, same as the
+ * original `cors()` config. An Origin present but not on the allow-list gets
+ * no `Access-Control-Allow-Origin` header, which makes the browser block the
+ * response client-side (equivalent to the Express CORS error path).
+ */
 function corsHeaders(req: Request): Record<string, string> {
-    const origin = req.headers.get("Origin");
-    const headers: Record<string, string> = {
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-razorpay-signature",
-        Vary: "Origin",
-    };
-    if (!origin) return headers; // non-browser caller — nothing to restrict
-    if (isOriginAllowed(origin)) {
-        headers["Access-Control-Allow-Origin"] = origin;
-    }
-    return headers;
+  const origin = req.headers.get("Origin");
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-razorpay-signature",
+    Vary: "Origin",
+  };
+  if (!origin) return headers; // non-browser caller — nothing to restrict
+  if (isOriginAllowed(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
 }
 
 function jsonResponse(req: Request, status: number, body: unknown, extraHeaders: Record<string, string> = {}): Response {
-    return new Response(JSON.stringify(body), {
-        status,
-        headers: {
-            "Content-Type": "application/json",
-            ...SECURITY_HEADERS,
-            ...corsHeaders(req),
-            ...extraHeaders,
-        },
-    });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...SECURITY_HEADERS,
+      ...corsHeaders(req),
+      ...extraHeaders,
+    },
+  });
 }
 
 function rawResponse(req: Request, status: number, body: string, extraHeaders: Record<string, string> = {}): Response {
-    return new Response(body, {
-        status,
-        headers: {
-            ...SECURITY_HEADERS,
-            ...corsHeaders(req),
-            ...extraHeaders,
-        },
-    });
+  return new Response(body, {
+    status,
+    headers: {
+      ...SECURITY_HEADERS,
+      ...corsHeaders(req),
+      ...extraHeaders,
+    },
+  });
 }
 
 const MAX_BODY_BYTES = 64 * 1024; // 64kb — matches express.json({ limit: "64kb" })
 
 /**
- * Reads the raw request body (capped at 64kb, mirroring the original body
- * limit) and returns both the raw text (needed for the webhook's HMAC check)
- * and the parsed JSON (empty object on parse failure — callers validate
- * their own required fields same as the Express routes did).
- */
+ * Reads the raw request body (capped at 64kb, mirroring the original body
+ * limit) and returns both the raw text (needed for the webhook's HMAC check)
+ * and the parsed JSON (empty object on parse failure — callers validate
+ * their own required fields same as the Express routes did).
+ */
 async function readBody(req: Request): Promise<{ raw: string; json: any }> {
-    const raw = await req.text();
-    if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
-        const e = new Error("Request body too large");
-        (e as any).code = "BODY_TOO_LARGE";
-        throw e;
-    }
-    let json: any = {};
-    try {
-        json = raw ? JSON.parse(raw) : {};
-    } catch {
-        json = {};
-    }
-    return { raw, json };
+  const raw = await req.text();
+  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
+    const e = new Error("Request body too large");
+    (e as any).code = "BODY_TOO_LARGE";
+    throw e;
+  }
+  let json: any = {};
+  try {
+    json = raw ? JSON.parse(raw) : {};
+  } catch {
+    json = {};
+  }
+  return { raw, json };
 }
 
 /** Handles the CORS preflight OPTIONS request every browser POST will send. */
 function handlePreflight(req: Request): Response | null {
-    if (req.method !== "OPTIONS") return null;
-    return new Response(null, { status: 204, headers: { ...SECURITY_HEADERS, ...corsHeaders(req) } });
+  if (req.method !== "OPTIONS") return null;
+  return new Response(null, { status: 204, headers: { ...SECURITY_HEADERS, ...corsHeaders(req) } });
 }
 
 /** Rejects any method outside the small allow-list each route needs. */
 function methodNotAllowed(req: Request, allow: string[]): Response | null {
-    if (allow.includes(req.method)) return null;
-    return jsonResponse(req, 405, { success: false, error: "Method not allowed" });
+  if (allow.includes(req.method)) return null;
+  return jsonResponse(req, 405, { success: false, error: "Method not allowed" });
 }
 
 /* ============================== clients.ts ============================== */
@@ -147,19 +149,19 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 let _admin: SupabaseClient | null = null;
 function supabaseAdmin(): SupabaseClient {
-    if (_admin) return _admin;
-    _admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    });
-    return _admin;
+  if (_admin) return _admin;
+  _admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  return _admin;
 }
 
 function supabaseForRequest(req: Request): SupabaseClient {
-    const authHeader = req.headers.get("Authorization") || "";
-    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-        global: { headers: { Authorization: authHeader } },
-    });
+  const authHeader = req.headers.get("Authorization") || "";
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: authHeader } },
+  });
 }
 
 /* ============================== auth.ts ============================== */
@@ -169,98 +171,98 @@ function supabaseForRequest(req: Request): SupabaseClient {
 type AuthResult = { user: User; error: null } | { user: null; error: Response };
 
 /**
- * Verifies the caller's Supabase JWT (sent as `Authorization: Bearer <token>`).
- * `supabase.auth.getUser()` round-trips to the Auth server, so this is a
- * fresh check every call — not just decoding a locally-cached claim, the
- * same guarantee the original's per-request `verifyIdToken()` gave.
- */
+ * Verifies the caller's Supabase JWT (sent as `Authorization: Bearer <token>`).
+ * `supabase.auth.getUser()` round-trips to the Auth server, so this is a
+ * fresh check every call — not just decoding a locally-cached claim, the
+ * same guarantee the original's per-request `verifyIdToken()` gave.
+ */
 async function requireAuth(req: Request): Promise<AuthResult> {
-    const header = req.headers.get("Authorization") || "";
-    if (!/^Bearer .+$/.test(header)) {
-        return { user: null, error: jsonResponse(req, 401, { success: false, error: "Not authenticated" }) };
-    }
-    const client = supabaseForRequest(req);
-    const { data, error } = await client.auth.getUser();
-    if (error || !data?.user) {
-        return { user: null, error: jsonResponse(req, 401, { success: false, error: "Invalid or expired session. Please log in again." }) };
-    }
-    return { user: data.user, error: null };
+    const header = req.headers.get("Authorization") || "";
+    if (!/^Bearer .+$/.test(header)) {
+        return { user: null, error: jsonResponse(req, 401, { success: false, error: "Not authenticated" }) };
+    }
+    const client = supabaseForRequest(req);
+    const { data, error } = await client.auth.getUser();
+    if (error || !data?.user) {
+        return { user: null, error: jsonResponse(req, 401, { success: false, error: "Invalid or expired session. Please log in again." }) };
+    }
+    return { user: data.user, error: null };
 }
 
 /**
- * requireAuth() + a `profiles.role === 'admin'` check.
- */
+ * requireAuth() + a `profiles.role === 'admin'` check.
+ */
 async function requireAdmin(req: Request, admin: SupabaseClient): Promise<AuthResult> {
-    const auth = await requireAuth(req);
-    if (!auth.user) return auth;
+    const auth = await requireAuth(req);
+    if (!auth.user) return auth;
 
-    const { data: profile, error } = await admin.from("profiles").select("role").eq("id", auth.user.id).maybeSingle();
-    if (error || !profile || profile.role !== "admin") {
-        return { user: null, error: jsonResponse(req, 403, { success: false, error: "Admin access required" }) };
-    }
-    return auth;
+    const { data: profile, error } = await admin.from("profiles").select("role").eq("id", auth.user.id).maybeSingle();
+    if (error || !profile || profile.role !== "admin") {
+        return { user: null, error: jsonResponse(req, 403, { success: false, error: "Admin access required" }) };
+    }
+    return auth;
 }
 
 /**
- * Admin-controlled kill switch. Reads settings/security's jsonb `data`.
- * A feature is disabled when `${feature}Enabled === false` OR `allDisabled === true`.
- * Missing row / missing flag → enabled (default-on), matching the original.
- */
+ * Admin-controlled kill switch. Reads settings/security's jsonb `data`.
+ * A feature is disabled when `${feature}Enabled === false` OR `allDisabled === true`.
+ * Missing row / missing flag → enabled (default-on), matching the original.
+ */
 async function isFeatureKilled(admin: SupabaseClient, feature: string): Promise<boolean> {
-    try {
-        const { data, error } = await admin.from("settings").select("data").eq("id", "security").maybeSingle();
-        if (error || !data) return false;
-        const d = data.data || {};
-        if (d.allDisabled === true) return true;
-        return d[`${feature}Enabled`] === false;
-    } catch (e) {
-        console.error("[isFeatureKilled] error:", e);
-        return false; // don't take the whole site down if this read fails
-    }
+    try {
+        const { data, error } = await admin.from("settings").select("data").eq("id", "security").maybeSingle();
+        if (error || !data) return false;
+        const d = data.data || {};
+        if (d.allDisabled === true) return true;
+        return d[`${feature}Enabled`] === false;
+    } catch (e) {
+        console.error("[isFeatureKilled] error:", e);
+        return false; // don't take the whole site down if this read fails
+    }
 }
 
 /**
- * Per-user block check. Reads `profiles.status`;
- * both 'blocked' and 'suspended' values are treated as blocked.
- */
+ * Per-user block check. Reads `profiles.status`;
+ * both 'blocked' and 'suspended' values are treated as blocked.
+ */
 async function isUserBlocked(admin: SupabaseClient, userId: string): Promise<boolean> {
-    try {
-        const { data, error } = await admin.from("profiles").select("status").eq("id", userId).maybeSingle();
-        if (error || !data) return false;
-        return data.status === "blocked" || data.status === "suspended";
-    } catch (e) {
-        console.error("[isUserBlocked] error:", e);
-        return false;
-    }
+    try {
+        const { data, error } = await admin.from("profiles").select("status").eq("id", userId).maybeSingle();
+        if (error || !data) return false;
+        return data.status === "blocked" || data.status === "suspended";
+    } catch (e) {
+        console.error("[isUserBlocked] error:", e);
+        return false;
+    }
 }
 
 /**
- * Checks if a promo code expiryDate is past the current time. Port of
- * isPromoExpired — handles ISO strings and naive local datetime strings.
- * expiry_date is stored as `timestamptz`, so values read back from Postgres
- * are always timezone-aware ISO strings in practice; the naive-datetime
- * branch is kept for parity with hand-entered/legacy values.
- */
+ * Checks if a promo code expiryDate is past the current time. Port of
+ * isPromoExpired — handles ISO strings and naive local datetime strings.
+ * expiry_date is stored as `timestamptz`, so values read back from Postgres
+ * are always timezone-aware ISO strings in practice; the naive-datetime
+ * branch is kept for parity with hand-entered/legacy values.
+ */
 function isPromoExpired(expiryDate: string | number | null | undefined): boolean {
-    if (!expiryDate) return false;
-    let expTime: number;
-    if (typeof expiryDate === "string" && !expiryDate.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(expiryDate)) {
-        const parts = expiryDate.split(/[-T:]/);
-        if (parts.length >= 5) {
-            expTime = new Date(
-                Number(parts[0]),
-                Number(parts[1]) - 1,
-                Number(parts[2]),
-                Number(parts[3]),
-                Number(parts[4]),
-            ).getTime();
-        } else {
-            expTime = new Date(expiryDate).getTime();
-        }
-    } else {
-        expTime = new Date(expiryDate).getTime();
-    }
-    return !isNaN(expTime) && Date.now() > expTime;
+    if (!expiryDate) return false;
+    let expTime: number;
+    if (typeof expiryDate === "string" && !expiryDate.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(expiryDate)) {
+        const parts = expiryDate.split(/[-T:]/);
+        if (parts.length >= 5) {
+            expTime = new Date(
+                Number(parts[0]),
+                Number(parts[1]) - 1,
+                Number(parts[2]),
+                Number(parts[3]),
+                Number(parts[4]),
+            ).getTime();
+        } else {
+            expTime = new Date(expiryDate).getTime();
+        }
+    } else {
+        expTime = new Date(expiryDate).getTime();
+    }
+    return !isNaN(expTime) && Date.now() > expTime;
 }
 
 /* ============================== rateLimit.ts ============================== */
@@ -271,55 +273,101 @@ function isPromoExpired(expiryDate: string | number | null | undefined): boolean
 // from anon/authenticated.
 
 /**
- * @param key     Unique bucket, e.g. `create-order:<uid>`
- * @param max     Max calls allowed per window
- * @param windowMs Window length in ms (converted to seconds for the RPC)
- * @param opts.failOpen  If true, allow the call when the limiter itself
- *        errors. Defaults to FAIL-CLOSED (deny), same as the original —
- *        a limiter outage must not be usable to bypass abuse protection on
- *        cost-bearing routes.
- */
+ * @param key     Unique bucket, e.g. `create-order:<uid>`
+ * @param max     Max calls allowed per window
+ * @param windowMs Window length in ms (converted to seconds for the RPC)
+ * @param opts.failOpen  If true, allow the call when the limiter itself
+ *        errors. Defaults to FAIL-CLOSED (deny), same as the original —
+ *        a limiter outage must not be usable to bypass abuse protection on
+ *        cost-bearing routes.
+ */
 async function rateLimit(
-    admin: SupabaseClient,
-    key: string,
-    max: number,
-    windowMs: number,
-    opts: { failOpen?: boolean } = {},
+  admin: SupabaseClient,
+  key: string,
+  max: number,
+  windowMs: number,
+  opts: { failOpen?: boolean } = {},
 ): Promise<boolean> {
-    const { failOpen = false } = opts;
-    try {
-        const { data, error } = await admin.rpc("rate_limit_check", {
-            p_key: key,
-            p_max: max,
-            p_window_seconds: Math.round(windowMs / 1000),
-        });
-        if (error) throw error;
-        return !!data;
-    } catch (e) {
-        console.error("[rateLimit] error:", e);
-        return failOpen;
-    }
+  const { failOpen = false } = opts;
+  try {
+    const { data, error } = await admin.rpc("rate_limit_check", {
+      p_key: key,
+      p_max: max,
+      p_window_seconds: Math.round(windowMs / 1000),
+    });
+    if (error) throw error;
+    return !!data;
+  } catch (e) {
+    console.error("[rateLimit] error:", e);
+    return failOpen;
+  }
 }
 
 /**
- * Global per-day counter — port of globalDailyLimit(). Reuses the same
- * rate_limit_check primitive: a day-stamped key (`global-<name>-<day>`) with
- * an 86400s window gives the identical "resets once a UTC day boundary is
- * crossed" behavior the original's day-string key achieved. FAIL-CLOSED.
- */
+ * Global per-day counter — port of globalDailyLimit(). Reuses the same
+ * rate_limit_check primitive: a day-stamped key (`global-<name>-<day>`) with
+ * an 86400s window gives the identical "resets once a UTC day boundary is
+ * crossed" behavior the original's day-string key achieved. FAIL-CLOSED.
+ */
 async function globalDailyLimit(admin: SupabaseClient, name: string, max: number, day: string): Promise<boolean> {
-    try {
-        const { data, error } = await admin.rpc("rate_limit_check", {
-            p_key: `global-${name}-${day}`,
-            p_max: max,
-            p_window_seconds: 86400,
-        });
-        if (error) throw error;
-        return !!data;
-    } catch (e) {
-        console.error("[globalDailyLimit] error:", e);
-        return false; // fail-closed
-    }
+  try {
+    const { data, error } = await admin.rpc("rate_limit_check", {
+      p_key: `global-${name}-${day}`,
+      p_max: max,
+      p_window_seconds: 86400,
+    });
+    if (error) throw error;
+    return !!data;
+  } catch (e) {
+    console.error("[globalDailyLimit] error:", e);
+    return false; // fail-closed
+  }
+}
+
+/* ============================== signature.ts ============================== */
+// ^ DELIBERATE: plain-JavaScript subset of TypeScript (no annotations), so its unit test (supabase/tests/signature.test.mjs) also runs in a browser on a
+//   machine without Node/Deno (tools/browser-test/Run-TsLiteTests.ps1) - the same convention as _shared/refundGateway.ts. Signature checks guard the
+//   money paths (a forged "payment captured" webhook, a forged checkout signature), so they want to be EXECUTED, not just compiled.
+//
+// The signature primitives behind payment-verify (HMAC of "order_id|payment_id" with the key secret) and payment-webhook (HMAC of the RAW request body with the
+// webhook secret). Phase 13 extracted them from razorpay.ts unchanged in behaviour, with one tightening: every check FAILS CLOSED - an empty / missing secret,
+// a missing or non-string signature or payload answers `false` instead of computing a digest with an empty key or throwing.
+
+/** HMAC-SHA256 of `data` (UTF-8) under `secret` (UTF-8), lower-case hex - the algorithm Razorpay documents (crypto.createHmac("sha256", secret).update(data).digest("hex")). */
+async function hmacHex(secret, data) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(data));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Constant-time string comparison (Deno's WebCrypto has no timingSafeEqual). A different LENGTH is refused at once: the length of a hex digest is not a secret.
+ * Strings are compared as UTF-8 bytes; anything that is not a string is compared as its text.
+ */
+function timingSafeEqual(a, b) {
+  const x = new TextEncoder().encode(String(a));
+  const y = new TextEncoder().encode(String(b));
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
+}
+
+/**
+ * True ONLY when `signature` is the HMAC-SHA256 hex digest of `data` under `secret`. Never throws, and answers false when
+ *   - the secret is not a non-empty string (a missing server secret must never validate anything: an HMAC with an empty key is a valid HMAC),
+ *   - the payload is not a string, or the signature is not a non-empty string (an upper-case / padded / truncated digest does not match: Razorpay sends lower-case hex).
+ */
+async function verifyHmacSignature(secret, data, signature) {
+  if (typeof secret !== "string" || secret === "") return false;
+  if (typeof data !== "string") return false;
+  if (typeof signature !== "string" || signature === "") return false;
+  try {
+    return timingSafeEqual(await hmacHex(secret, data), signature);
+  } catch (_e) {
+    return false;
+  }
 }
 
 /* ============================== razorpay.ts ============================== */
@@ -332,352 +380,376 @@ let _razorpay: Razorpay | null = null;
 
 /** Lazily builds the Razorpay client (env isn't present at deploy-analysis time). */
 function getRazorpay(): Razorpay {
-    if (_razorpay) return _razorpay;
-    const key_id = Deno.env.get("RAZORPAY_KEY_ID");
-    const key_secret = Deno.env.get("RAZORPAY_KEY_SECRET");
-    if (!key_id || !key_secret) {
-        throw new Error("Missing RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET env vars");
-    }
-    _razorpay = new Razorpay({ key_id, key_secret });
-    return _razorpay;
+  if (_razorpay) return _razorpay;
+  const key_id = Deno.env.get("RAZORPAY_KEY_ID");
+  const key_secret = Deno.env.get("RAZORPAY_KEY_SECRET");
+  if (!key_id || !key_secret) {
+    throw new Error("Missing RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET env vars");
+  }
+  _razorpay = new Razorpay({ key_id, key_secret });
+  return _razorpay;
 }
 
-/** HMAC-SHA256 over `data` with `secret`, hex-encoded — same algorithm as crypto.createHmac. */
-async function hmacHex(secret: string, data: string): Promise<string> {
-    const key = await crypto.subtle.importKey(
-        "raw",
-        new TextEncoder().encode(secret),
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["sign"],
-    );
-    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
-    return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** Constant-time string comparison — Deno has no built-in crypto.timingSafeEqual. */
-function timingSafeEqual(a: string, b: string): boolean {
-    const aBytes = new TextEncoder().encode(a);
-    const bBytes = new TextEncoder().encode(b);
-    if (aBytes.length !== bBytes.length) return false;
-    let diff = 0;
-    for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
-    return diff === 0;
-}
+// The HMAC primitives live in ./signature.ts (plain-JavaScript subset, unit-tested in supabase/tests/signature.test.mjs); they FAIL CLOSED: a missing
+// secret or signature answers false (Phase 13 - before, a missing key secret made crypto.subtle throw, a missing webhook secret was handled here only).
 
 /** Verifies a /verify payload's signature: HMAC(order_id|payment_id) with the key secret. */
 async function verifyPaymentSignature(orderId: string, paymentId: string, signature: string): Promise<boolean> {
-    const secret = Deno.env.get("RAZORPAY_KEY_SECRET") || "";
-    const expected = await hmacHex(secret, `${orderId}|${paymentId}`);
-    return timingSafeEqual(expected, String(signature));
+  return verifyHmacSignature(Deno.env.get("RAZORPAY_KEY_SECRET") || "", `${orderId}|${paymentId}`, String(signature));
 }
 
 /** Verifies a webhook payload's signature: HMAC(raw body) with the webhook secret. */
 async function verifyWebhookSignature(rawBody: string, signature: string): Promise<boolean> {
-    const secret = Deno.env.get("RAZORPAY_WEBHOOK_SECRET") || "";
-    if (!secret) return false;
-    const expected = await hmacHex(secret, rawBody);
-    return timingSafeEqual(expected, String(signature));
+  return verifyHmacSignature(Deno.env.get("RAZORPAY_WEBHOOK_SECRET") || "", rawBody, String(signature));
 }
 
-/* ============================== pricing.ts ============================== */
-// Port of functions/lib/orderWriter.js's GST helpers + functions/routes/payment.js's
-// discount/shipping/promo logic. This is exact financial math — keep every
-// formula, rounding rule and check order identical to the source. Buyer state
-// now comes from `profiles.address->>'state'`, seller state from the
-// `invoiceSettings` row's `data->>'state'` (both were Firestore doc fields
-// before).
+/* ============================== cartPricing.ts ============================== */
+// PURE pricing logic shared by every order channel (no Deno / Supabase imports on
+// purpose, so it can be unit-tested under Node: supabase/tests/pricing.test.mjs).
+//
+// Contents: money helpers, GST maths (moved verbatim from pricing.ts), and
+// priceCartItems() — now option-aware.
+//
+// THE MODEL (see IMPLEMENTATION_PLAN §4.1): a purchasable option is
+//   (productId, variantId)   with variantId '' / undefined = the main (or only) option.
+//   * single product            -> one option: the product itself
+//   * product with variants     -> the main option (when main_option_enabled) + one per ACTIVE variant
+// Each option has its OWN price / stock / SKU. The main price is never derived from variants.
+//
+// Two modes:
+//   * TABLE mode  (variantsByProduct supplied): variants come from `product_variants`
+//     (migration M1). Authoritative.
+//   * LEGACY mode (variantsByProduct undefined): variants are read from the products.variants
+//     jsonb exactly like the pre-M1 code — kept so these functions still work if they are
+//     deployed before the SQL migration has been applied.
 
 const round2 = (n: number): number => Math.round((Number(n) || 0) * 100) / 100;
 
 type LineItem = {
-    productId: string;
-    variantId?: string | null;
-    variantName?: string | null;
-    title: string;
-    category: string;
-    sku?: string;
-    quantity: number;
-    originalPrice: number;
-    discount: number;
-    finalPrice: number;
-    gstRate: number;
-    hsnCode: string;
+  productId: string;
+  variantId?: string | null;
+  variantName?: string | null;
+  /** 'single' | 'main' | 'variant' — informational; the DB derives the authoritative value. */
+  itemType?: "single" | "main" | "variant";
+  title: string;
+  category: string;
+  sku?: string;
+  quantity: number;
+  originalPrice: number;
+  discount: number;
+  finalPrice: number;
+  gstRate: number;
+  hsnCode: string;
 };
 
 type GstLineItem = LineItem & {
-    taxableValue: number;
-    gstAmount: number;
-    cgstAmount: number;
-    sgstAmount: number;
-    igstAmount: number;
+  taxableValue: number;
+  gstAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
 };
 
 /** Per-UNIT taxable value + gst amount for a GST-inclusive unit price. */
 function unitGst(finalPrice: number, gstRate: number): { taxableValue: number; gstAmount: number } {
-    const price = Number(finalPrice) || 0;
-    const rate = Number(gstRate) || 0;
-    if (rate <= 0) return { taxableValue: round2(price), gstAmount: 0 };
-    const taxableValue = round2((price * 100) / (100 + rate));
-    const gstAmount = round2(price - taxableValue);
-    return { taxableValue, gstAmount };
+  const price = Number(finalPrice) || 0;
+  const rate = Number(gstRate) || 0;
+  if (rate <= 0) return { taxableValue: round2(price), gstAmount: 0 };
+  const taxableValue = round2((price * 100) / (100 + rate));
+  const gstAmount = round2(price - taxableValue);
+  return { taxableValue, gstAmount };
 }
 
 /**
- * Enrich each line item with GST fields. CGST=ceil, SGST=floor so the two
- * always sum to the line's GST exactly (matches orderWriter.js).
- */
+ * Enrich each line item with GST fields. CGST=ceil, SGST=floor so the two
+ * always sum to the line's GST exactly (matches orderWriter.js).
+ */
 function applyGstToItems(items: LineItem[], isInterState: boolean): GstLineItem[] {
-    return (items || []).map((it) => {
-        const rate = Number(it.gstRate) || 0;
-        const qty = Number(it.quantity) || 0;
-        const { taxableValue, gstAmount } = unitGst(it.finalPrice, rate);
-        const lineGst = round2(gstAmount * qty);
-        let cgstAmount = 0, sgstAmount = 0, igstAmount = 0;
-        if (isInterState) {
-            igstAmount = lineGst;
-        } else {
-            cgstAmount = Math.ceil((lineGst / 2) * 100) / 100;
-            sgstAmount = Math.floor((lineGst / 2) * 100) / 100;
-        }
-        return {
-            ...it,
-            gstRate: rate,
-            hsnCode: it.hsnCode || "",
-            taxableValue,
-            gstAmount,
-            cgstAmount,
-            sgstAmount,
-            igstAmount,
-        };
-    });
+  return (items || []).map((it) => {
+    const rate = Number(it.gstRate) || 0;
+    const qty = Number(it.quantity) || 0;
+    const { taxableValue, gstAmount } = unitGst(it.finalPrice, rate);
+    const lineGst = round2(gstAmount * qty);
+    let cgstAmount = 0, sgstAmount = 0, igstAmount = 0;
+    if (isInterState) {
+      igstAmount = lineGst;
+    } else {
+      cgstAmount = Math.ceil((lineGst / 2) * 100) / 100;
+      sgstAmount = Math.floor((lineGst / 2) * 100) / 100;
+    }
+    return {
+      ...it,
+      gstRate: rate,
+      hsnCode: it.hsnCode || "",
+      taxableValue,
+      gstAmount,
+      cgstAmount,
+      sgstAmount,
+      igstAmount,
+    };
+  });
 }
 
 /** Sum GST-enriched line items into order-level totals. */
 function sumGstTotals(items: GstLineItem[]) {
-    const list = items || [];
-    return {
-        taxableTotal: round2(list.reduce((s, it) => s + (Number(it.taxableValue) || 0) * (Number(it.quantity) || 0), 0)),
-        totalCgst: round2(list.reduce((s, it) => s + (Number(it.cgstAmount) || 0), 0)),
-        totalSgst: round2(list.reduce((s, it) => s + (Number(it.sgstAmount) || 0), 0)),
-        totalIgst: round2(list.reduce((s, it) => s + (Number(it.igstAmount) || 0), 0)),
-    };
+  const list = items || [];
+  return {
+    taxableTotal: round2(list.reduce((s, it) => s + (Number(it.taxableValue) || 0) * (Number(it.quantity) || 0), 0)),
+    totalCgst: round2(list.reduce((s, it) => s + (Number(it.cgstAmount) || 0), 0)),
+    totalSgst: round2(list.reduce((s, it) => s + (Number(it.sgstAmount) || 0), 0)),
+    totalIgst: round2(list.reduce((s, it) => s + (Number(it.igstAmount) || 0), 0)),
+  };
 }
 
 /** True when buyer + seller states are both known and differ (→ IGST). */
 function resolveInterState(buyerState: string, sellerState: string): boolean {
-    const b = String(buyerState || "").trim().toLowerCase();
-    const s = String(sellerState || "").trim().toLowerCase();
-    return !!(b && s && b !== s);
+  const b = String(buyerState || "").trim().toLowerCase();
+  const s = String(sellerState || "").trim().toLowerCase();
+  return !!(b && s && b !== s);
 }
 
 /**
- * Product-level discount, ignoring it once discount_expiry has passed.
- * Mirrors payment.js's activeProductDiscount() / the frontend's isDiscountActive().
- * Used by create-order, cod-create and manual-create — NOT by billing-create,
- * which (faithfully, matching the original orders.js) applies `products.discount`
- * unconditionally with no expiry check.
- */
+ * Product-level discount, ignoring it once discount_expiry has passed.
+ * Mirrors the frontend's isDiscountActive(). The discount is PRODUCT-level and applies to
+ * every option of the product (main and variants) — there is no per-variant discount.
+ */
 function activeProductDiscount(p: { discount?: number; discount_expiry?: string | null }): number {
-    const raw = Number(p.discount || 0);
-    if (raw > 0 && p.discount_expiry) {
-        const expiryMs = new Date(p.discount_expiry).getTime();
-        if (!isNaN(expiryMs) && Date.now() > expiryMs) return 0;
-    }
-    return raw;
+  const raw = Number(p.discount || 0);
+  if (raw > 0 && p.discount_expiry) {
+    const expiryMs = new Date(p.discount_expiry).getTime();
+    if (!isNaN(expiryMs) && Date.now() > expiryMs) return 0;
+  }
+  return raw;
 }
 
-/**
- * NOTE on category discounts: the original Firestore products carried a
- * separate `categoryDiscount` field, and every route did
- * `Math.max(productDiscount, categoryDiscount)`. The Supabase products table
- * (01-schema.sql) has no such column — AddDiscountPage's bulk "apply to
- * category" writes straight into the single `discount` column for every
- * matching product (see src/pages/AddDiscountPage/AddDiscountPage.jsx), so
- * that max() has already collapsed into one value by the time any of these
- * functions read it. There is nothing left to max() against.
- */
+type LegacyVariantJson = { id: string; name: string; price: number; stock: number; sku?: string };
 
 type ProductRow = {
-    id: string;
-    title: string | null;
-    category: string | null;
-    sku: string | null;
-    price: number;
-    stock: number;
-    discount: number;
-    discount_expiry: string | null;
-    gst_rate: number;
-    hsn_code: string | null;
-    /** JSONB array of variant objects set when has_variants = true. */
-    variants?: Array<{ id: string; name: string; price: number; stock: number; sku?: string }> | null;
+  id: string;
+  title: string | null;
+  category: string | null;
+  sku: string | null;
+  price: number;
+  stock: number;
+  discount: number;
+  discount_expiry: string | null;
+  gst_rate: number;
+  hsn_code: string | null;
+  // --- M1 columns (undefined before the migration) ---
+  has_variants?: boolean;
+  main_option_enabled?: boolean;
+  track_inventory?: boolean;
+  /** JSONB array of variant objects (legacy source / trigger-maintained cache). */
+  variants?: LegacyVariantJson[] | null;
+};
+
+/** A row of public.product_variants (M1). */
+type VariantRow = {
+  id: string;
+  product_id: string;
+  name: string;
+  sku: string | null;
+  price: number;
+  stock: number;
+  track_inventory?: boolean;
+  status?: "active" | "inactive";
 };
 
 type PriceItemsResult =
-    | { ok: true; lineItems: LineItem[]; subtotal: number }
-    | { ok: false; status: number; error: string };
+  | { ok: true; lineItems: LineItem[]; subtotal: number }
+  | { ok: false; status: number; error: string };
+
+type CartItemInput = {
+  productId?: string;
+  product_id?: string;
+  id?: string;
+  variantId?: string | null;
+  variant_id?: string | null;
+  quantity?: number;
+};
+
+type PriceOptions = {
+  /** default true. orders-billing-create deliberately keeps the legacy "no expiry check" behaviour. */
+  honorDiscountExpiry?: boolean;
+};
 
 /**
- * Server-authoritative per-line pricing shared by /create-order and
- * /cod-create (identical validation order + discount rule in the original:
- * not-found → 400, not-purchasable (price<=0) → 400, insufficient stock →
- * 409, expiry-aware discount).
- *
- * When `variantId` is supplied for an item the function looks up that variant
- * inside `product.variants` and uses the variant's price/stock instead of
- * the product-level fields, while still applying the parent product's GST
- * rate and discount.
- */
+ * Splits a cart/bill line into (productId, variantId, qty). Variant ids carry the `var_` prefix and
+ * product ids contain underscores, so a bare "_" must never be split on: the only recognised
+ * compound form is `${productId}_var_${suffix}` (legacy Redux id).
+ */
+function parseCartItemRef(it: CartItemInput): { pid: string; variantId: string; qty: number } {
+  const rawPid = String(it?.productId || it?.product_id || it?.id || "");
+  const compound = rawPid.includes("_var_");
+  const pid = compound ? rawPid.split("_var_")[0] : rawPid;
+  const variantId = String(it?.variantId || it?.variant_id || (compound ? "var_" + rawPid.split("_var_")[1] : "") || "");
+  const qty = Math.floor(Number(it?.quantity) || 0);
+  return { pid, variantId, qty };
+}
+
+/** Distinct product ids referenced by a list of cart/bill lines (for the catalog query). */
+function collectProductIds(items: CartItemInput[]): string[] {
+  return [...new Set((items || []).map((i) => parseCartItemRef(i).pid).filter(Boolean))];
+}
+
+/**
+ * Server-authoritative per-line pricing shared by create-order, cod-create and billing.
+ * Validation order (unchanged): invalid line → 400, product missing → 400, option unknown/unavailable → 400/409,
+ * not purchasable (price <= 0) → 400, insufficient stock → 409. Discount is expiry-aware by default.
+ */
 function priceCartItems(
-    items: Array<{ productId?: string; product_id?: string; id?: string; variantId?: string | null; variant_id?: string | null; quantity?: number }>,
-    productsById: Map<string, ProductRow>,
+  items: CartItemInput[],
+  productsById: Map<string, ProductRow>,
+  variantsByProduct?: Map<string, VariantRow[]>,
+  opts: PriceOptions = {},
 ): PriceItemsResult {
-    const lineItems: LineItem[] = [];
-    let subtotal = 0;
+  const honorExpiry = opts.honorDiscountExpiry !== false;
+  const lineItems: LineItem[] = [];
+  let subtotal = 0;
 
-    for (const it of items) {
-        const rawPid = String(it?.productId || it?.product_id || it?.id || "");
-        const pid = rawPid.includes("_var_") ? rawPid.split("_var_")[0] : rawPid;
-        const variantId = it?.variantId || it?.variant_id || (rawPid.includes("_var_") ? "var_" + rawPid.split("_var_")[1] : undefined);
-        const qty = Math.floor(Number(it?.quantity) || 0);
-        if (!pid || qty <= 0) {
-            return { ok: false, status: 400, error: "Invalid cart item" };
-        }
+  for (const it of items) {
+    const { pid, variantId, qty } = parseCartItemRef(it);
+    if (!pid || qty <= 0) {
+      return { ok: false, status: 400, error: "Invalid cart item" };
+    }
 
-        const p = productsById.get(pid);
-        if (!p) {
-            return { ok: false, status: 400, error: `Product not found: ${pid}` };
-        }
+    const p = productsById.get(pid);
+    if (!p) {
+      return { ok: false, status: 400, error: `Product not found: ${pid}` };
+    }
 
-        // Resolve price & stock — prefer variant values when a variantId is supplied.
-        let price = Number(p.price || 0);
-        let stock = Number(p.stock || 0);
-        let resolvedSku: string | undefined = p.sku ?? undefined;
-        let resolvedVariantName: string | undefined = undefined;
+    let price = Number(p.price || 0);
+    let stock = Number(p.stock || 0);
+    let tracked = p.track_inventory !== false;
+    let resolvedSku: string | undefined = p.sku ?? undefined;
+    let resolvedVariantName: string | undefined = undefined;
+    let itemType: LineItem["itemType"] = "single";
+    let outVariantId: string | undefined = undefined;
 
-        if (variantId && Array.isArray(p.variants) && p.variants.length > 0) {
-            const variant = p.variants.find((v) => String(v.id) === String(variantId));
-            if (!variant) {
-                return { ok: false, status: 400, error: `Variant not found: ${variantId} for product ${pid}` };
-            }
-            price = Number(variant.price || 0);
-            stock = Number(variant.stock || 0);
-            resolvedVariantName = variant.name;
-            if (variant.sku) resolvedSku = variant.sku;
-        }
+    if (variantsByProduct) {
+      // ---- TABLE mode -------------------------------------------------------------
+      const variants = variantsByProduct.get(pid) || [];
+      if (variantId) {
+        const v = variants.find((x) => String(x.id) === variantId);
+        if (!v) {
+          return { ok: false, status: 400, error: `Variant not found: ${variantId} for product ${pid}` };
+        }
+        if (v.status && v.status !== "active") {
+          return { ok: false, status: 409, error: `${p.title || pid} (${v.name}) is no longer available` };
+        }
+        price = Number(v.price || 0);
+        stock = Number(v.stock || 0);
+        tracked = v.track_inventory !== false;
+        resolvedVariantName = v.name;
+        resolvedSku = v.sku || undefined;
+        itemType = "variant";
+        outVariantId = String(v.id);
+      } else if (p.has_variants || variants.length > 0) {
+        if (p.main_option_enabled === false) {
+          return { ok: false, status: 409, error: `Please choose an option for ${p.title || pid}` };
+        }
+        itemType = "main";
+      }
+    } else if (variantId && Array.isArray(p.variants) && p.variants.length > 0) {
+      // ---- LEGACY mode (pre-M1): variant data from the products.variants jsonb --------
+      const variant = p.variants.find((v) => String(v.id) === variantId);
+      if (!variant) {
+        return { ok: false, status: 400, error: `Variant not found: ${variantId} for product ${pid}` };
+      }
+      price = Number(variant.price || 0);
+      stock = Number(variant.stock || 0);
+      resolvedVariantName = variant.name;
+      if (variant.sku) resolvedSku = variant.sku;
+      itemType = "variant";
+      outVariantId = variantId;
+    } else if (variantId) {
+      outVariantId = variantId; // legacy behaviour: unknown variant on a product without any -> priced as main
+    }
 
-        if (price <= 0) {
-            return { ok: false, status: 400, error: `Product not purchasable: ${p.title || pid}` };
-        }
-        if (stock < qty) {
-            return { ok: false, status: 409, error: `Not enough stock for ${p.title || pid}${variantId ? ` (variant ${resolvedVariantName || variantId})` : ""}` };
-        }
+    if (price <= 0) {
+      return { ok: false, status: 400, error: `Product not purchasable: ${p.title || pid}` };
+    }
+    if (tracked && stock < qty) {
+      return {
+        ok: false,
+        status: 409,
+        error: `Not enough stock for ${p.title || pid}${resolvedVariantName ? ` (variant ${resolvedVariantName})` : ""}`,
+      };
+    }
 
-        const finalDiscount = activeProductDiscount(p);
-        const finalPrice = price - (price * finalDiscount) / 100;
+    const finalDiscount = honorExpiry ? activeProductDiscount(p) : Number(p.discount || 0);
+    const finalPrice = price - (price * finalDiscount) / 100;
 
-        subtotal += finalPrice * qty;
+    subtotal += finalPrice * qty;
 
-        lineItems.push({
-            productId: pid,
-            variantId: variantId ? String(variantId) : undefined,
-            variantName: resolvedVariantName,
-            title: resolvedVariantName ? `${p.title || "Product"} [${resolvedVariantName}]` : (p.title || "Product"),
-            category: p.category || "general",
-            sku: resolvedSku,
-            quantity: qty,
-            originalPrice: price,
-            discount: finalDiscount,
-            finalPrice,
-            gstRate: Number(p.gst_rate || 0),
-            hsnCode: p.hsn_code || "",
-        });
-    }
+    lineItems.push({
+      productId: pid,
+      variantId: outVariantId,
+      variantName: resolvedVariantName,
+      itemType,
+      title: resolvedVariantName ? `${p.title || "Product"} [${resolvedVariantName}]` : (p.title || "Product"),
+      category: p.category || "general",
+      sku: resolvedSku,
+      quantity: qty,
+      originalPrice: price,
+      discount: finalDiscount,
+      finalPrice,
+      gstRate: Number(p.gst_rate || 0),
+      hsnCode: p.hsn_code || "",
+    });
+  }
 
-    return { ok: true, lineItems, subtotal };
+  return { ok: true, lineItems, subtotal };
 }
-
-/** Reads settings row id='shippingSettings'. Same defaults as the original (₹500 / ₹49). */
-async function getShippingConfig(admin: SupabaseClient): Promise<{ threshold: number; fee: number }> {
-    let threshold = 500;
-    let fee = 49;
-    try {
-        const { data, error } = await admin.from("settings").select("data").eq("id", "shippingSettings").maybeSingle();
-        if (!error && data?.data) {
-            const sd = data.data;
-            if (typeof sd.freeShippingThreshold === "number") threshold = sd.freeShippingThreshold;
-            if (typeof sd.shippingCost === "number") fee = sd.shippingCost;
-        }
-    } catch (e) {
-        console.warn("[pricing] shipping settings lookup failed, using defaults:", e);
-    }
-    return { threshold, fee };
-}
-
-/** Reads settings row id='invoiceSettings'.state — the seller's state for the GST split. */
-async function getSellerState(admin: SupabaseClient): Promise<string> {
-    try {
-        const { data, error } = await admin.from("settings").select("data").eq("id", "invoiceSettings").maybeSingle();
-        if (error || !data?.data) return "";
-        return data.data.state || "";
-    } catch (e) {
-        console.warn("[pricing] seller state lookup failed:", e);
-        return "";
-    }
-}
-
-/** Reads profiles.address->>'state' for the given user — the buyer's state for the GST split. */
-async function getBuyerState(admin: SupabaseClient, userId: string): Promise<string> {
-    try {
-        const { data, error } = await admin.from("profiles").select("address").eq("id", userId).maybeSingle();
-        if (error || !data) return "";
-        return data.address?.state || "";
-    } catch (e) {
-        console.warn("[pricing] buyer state lookup failed:", e);
-        return "";
-    }
-}
-
-/** Reads settings row id='paymentSettings'.codPayment. Defaults to enabled (matches the original). */
-async function isCodEnabled(admin: SupabaseClient): Promise<boolean> {
-    try {
-        const { data, error } = await admin.from("settings").select("data").eq("id", "paymentSettings").maybeSingle();
-        if (error || !data?.data) return true;
-        return data.data.codPayment !== false;
-    } catch (e) {
-        console.warn("[pricing] payment settings lookup failed:", e);
-        return true;
-    }
-}
-
-type PromoResult = { discount: number; appliedCode: string };
 
 /**
- * Validates + resolves a promo code against `promo_codes`. Silently ignores
- * invalid/unknown/expired codes (amount stays 0), same as the original — the
- * client only ever sends a code string, never a discount amount.
- */
-async function resolvePromoDiscount(admin: SupabaseClient, promoCode: string | undefined, subtotal: number): Promise<PromoResult> {
-    if (!promoCode || typeof promoCode !== "string" || !promoCode.trim()) {
-        return { discount: 0, appliedCode: "" };
-    }
-    const code = promoCode.trim().toUpperCase();
-    try {
-        const { data: pd, error } = await admin.from("promo_codes").select("*").eq("code", code).maybeSingle();
-        if (error || !pd) return { discount: 0, appliedCode: "" };
+ * Resolves a product + option from a catalog for the channels that identify products by TEXT
+ * (WhatsApp paste, bulk order import): "Designer Shirt [Pink]" -> product "Designer Shirt", variant "Pink".
+ * Tries the full text first (a product's own title may end in brackets), then the bracket split.
+ * Returns an error string instead of guessing when anything is ambiguous.
+ */
+function resolveOptionByTitle(
+  rawTitle: string,
+  products: ProductRow[],
+  variantsByProduct: Map<string, VariantRow[]> | undefined,
+): { ok: true; product: ProductRow; variant: VariantRow | null } | { ok: false; error: string } {
+  const text = String(rawTitle || "").trim();
+  const lower = (s: unknown) => String(s ?? "").toLowerCase().trim();
+  const byTitle = (needle: string) => {
+    let m = products.filter((p) => typeof p.title === "string" && lower(p.title) === needle);
+    if (!m.length) m = products.filter((p) => typeof p.title === "string" && lower(p.title).startsWith(needle));
+    return m;
+  };
 
-        if (isPromoExpired(pd.expiry_date)) return { discount: 0, appliedCode: "" };
+  // 1) the whole text is a product title
+  const whole = byTitle(lower(text));
+  if (whole.length === 1) return pickMain(whole[0], variantsByProduct);
+  if (whole.length > 1) {
+    return { ok: false, error: `Ambiguous product title "${text}". Matches: ${whole.map((p) => p.title).join(", ")}` };
+  }
 
-        const value = Number(pd.value || 0);
-        let discount = 0;
-        if (pd.type === "percent") discount = Math.round((subtotal * value) / 100);
-        else if (pd.type === "flat") discount = value;
-        discount = Math.max(0, discount);
-        return { discount, appliedCode: code };
-    } catch (e) {
-        console.warn("[pricing] promo lookup failed:", e);
-        return { discount: 0, appliedCode: "" };
-    }
+  // 2) "<product> [<variant>]"
+  const m = text.match(/^(.*?)\s*\[([^\]]+)\]\s*$/);
+  if (m && m[1].trim()) {
+    const base = byTitle(lower(m[1]));
+    if (!base.length) return { ok: false, error: `Product not found: "${text}"` };
+    if (base.length > 1) return { ok: false, error: `Ambiguous product title "${m[1].trim()}". Matches: ${base.map((p) => p.title).join(", ")}` };
+    const p = base[0];
+    const variants = (variantsByProduct?.get(p.id) || []).filter((v) => !v.status || v.status === "active");
+    const named = variants.filter((v) => lower(v.name) === lower(m[2]));
+    if (named.length === 1) return { ok: true, product: p, variant: named[0] };
+    if (named.length > 1) return { ok: false, error: `Ambiguous variant "${m[2].trim()}" of "${p.title}" — more than one variant has that name` };
+    return { ok: false, error: `Variant not found: "${m[2].trim()}" for product "${p.title}"` };
+  }
+  return { ok: false, error: `Product not found: "${text}"` };
+}
+
+function pickMain(p: ProductRow, variantsByProduct: Map<string, VariantRow[]> | undefined) {
+  const hasVariants = !!p.has_variants || (variantsByProduct?.get(p.id)?.length ?? 0) > 0;
+  if (hasVariants && p.main_option_enabled === false) {
+    return { ok: false as const, error: `"${p.title}" has no main option — name the variant, e.g. "${p.title} [Variant]"` };
+  }
+  return { ok: true as const, product: p, variant: null };
 }
 
 /* ============================== orderWriter.ts ============================== */
@@ -685,92 +757,104 @@ async function resolvePromoDiscount(admin: SupabaseClient, promoCode: string | u
 // Must be called with the SERVICE ROLE client; the RPC is REVOKEd from anon/authenticated.
 
 type CreateOrderParams = {
-    orderId: string;
-    userId: string | null;
-    items: GstLineItem[];
-    orderStatus: string;
-    paymentStatus: string;
-    paymentMethod: string;
-    source: string;
-    customerName: string;
-    customerEmail: string;
-    customerPhone: string;
-    address: unknown;
-    subtotal: number;
-    shipping: number;
-    cgst: number;
-    sgst: number;
-    igst: number;
-    promoCode: string;
-    promoDiscount: number;
-    total: number;
-    razorpayOrderId?: string | null;
-    razorpayPaymentId?: string | null;
+  orderId: string;
+  userId: string | null;
+  items: GstLineItem[];
+  orderStatus: string;
+  paymentStatus: string;
+  paymentMethod: string;
+  source: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  address: unknown;
+  subtotal: number;
+  shipping: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  promoCode: string;
+  promoDiscount: number;
+  total: number;
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
 };
 
 class StockError extends Error {
-    code = "STOCK";
-}
-
-/** Maps GST-enriched line items into create_order_tx's p_items jsonb shape. */
-function toOrderItemsJson(items: GstLineItem[]) {
-    return items.map((it) => ({
-        product_id: it.productId,
-        variant_id: it.variantId || null,
-        variant_name: it.variantName || null,
-        title: it.title,
-        quantity: it.quantity,
-        unit_price: it.finalPrice,
-        discount: it.discount,
-        cgst: it.cgstAmount,
-        sgst: it.sgstAmount,
-        igst: it.igstAmount,
-        line_total: round2(it.finalPrice * it.quantity),
-    }));
+  code = "STOCK";
 }
 
 /**
- * Calls create_order_tx. Idempotent by design (the RPC returns the existing
- * row if `orderId` already exists — see its comment block) — both /verify
- * and /webhook rely on this instead of re-implementing ALREADY_FINALIZED
- * checks themselves.
- *
- * Throws StockError when the RPC raises "Insufficient stock for product %",
- * so callers can map it to a 409 the same way the original STOCK-coded
- * errors were handled.
- */
-async function createOrderTx(admin: SupabaseClient, p: CreateOrderParams) {
-    const { data, error } = await admin.rpc("create_order_tx", {
-        p_order_id: p.orderId,
-        p_user_id: p.userId,
-        p_items: toOrderItemsJson(p.items),
-        p_order_status: p.orderStatus,
-        p_payment_status: p.paymentStatus,
-        p_payment_method: p.paymentMethod,
-        p_source: p.source,
-        p_customer_name: p.customerName,
-        p_customer_email: p.customerEmail,
-        p_customer_phone: p.customerPhone,
-        p_address: p.address,
-        p_subtotal: p.subtotal,
-        p_shipping: p.shipping,
-        p_cgst: p.cgst,
-        p_sgst: p.sgst,
-        p_igst: p.igst,
-        p_promo_code: p.promoCode,
-        p_promo_discount: p.promoDiscount,
-        p_total: p.total,
-        p_razorpay_order_id: p.razorpayOrderId ?? null,
-        p_razorpay_payment_id: p.razorpayPaymentId ?? null,
-    });
+ * Maps GST-enriched line items into create_order_tx's p_items jsonb shape.
+ *
+ * `mrp`, `gst_rate`, `hsn_code` are the purchase-time snapshot values (migration M1). The RPC derives
+ * the remaining snapshot fields (variant name, SKU, image, return/exchange policy, item type) from
+ * the database INSIDE the transaction, so they are deliberately not sent from here. An RPC that
+ * predates M1 simply ignores the extra keys.
+ */
+function toOrderItemsJson(items: GstLineItem[]) {
+  return items.map((it) => ({
+    product_id: it.productId,
+    variant_id: it.variantId || null,
+    variant_name: it.variantName || null,
+    title: it.title,
+    quantity: it.quantity,
+    unit_price: it.finalPrice,
+    mrp: it.originalPrice,
+    discount: it.discount,
+    gst_rate: it.gstRate,
+    hsn_code: it.hsnCode || null,
+    cgst: it.cgstAmount,
+    sgst: it.sgstAmount,
+    igst: it.igstAmount,
+    line_total: round2(it.finalPrice * it.quantity),
+  }));
+}
 
-    if (error) {
-        if (/insufficient stock/i.test(error.message || "")) {
-            throw new StockError(error.message);
-        }
-        throw error;
-    }
-    return data; // the orders row (existing or newly-inserted)
+/**
+ * Calls create_order_tx. Idempotent by design (the RPC returns the existing
+ * row if `orderId` already exists — see its comment block) — both /verify
+ * and /webhook rely on this instead of re-implementing ALREADY_FINALIZED
+ * checks themselves.
+ *
+ * Throws StockError when the RPC raises "Insufficient stock for product %",
+ * so callers can map it to a 409 the same way the original STOCK-coded
+ * errors were handled.
+ */
+async function createOrderTx(admin: SupabaseClient, p: CreateOrderParams) {
+  const { data, error } = await admin.rpc("create_order_tx", {
+    p_order_id: p.orderId,
+    p_user_id: p.userId,
+    p_items: toOrderItemsJson(p.items),
+    p_order_status: p.orderStatus,
+    p_payment_status: p.paymentStatus,
+    p_payment_method: p.paymentMethod,
+    p_source: p.source,
+    p_customer_name: p.customerName,
+    p_customer_email: p.customerEmail,
+    p_customer_phone: p.customerPhone,
+    p_address: p.address,
+    p_subtotal: p.subtotal,
+    p_shipping: p.shipping,
+    p_cgst: p.cgst,
+    p_sgst: p.sgst,
+    p_igst: p.igst,
+    p_promo_code: p.promoCode,
+    p_promo_discount: p.promoDiscount,
+    p_total: p.total,
+    p_razorpay_order_id: p.razorpayOrderId ?? null,
+    p_razorpay_payment_id: p.razorpayPaymentId ?? null,
+  });
+
+  if (error) {
+    // "Insufficient stock for product …" (stock) and "… no longer available" (an option that was
+    // deactivated/deleted/disabled between pricing and writing) are both customer-facing 409s.
+    if (/insufficient stock|no longer available/i.test(error.message || "")) {
+      throw new StockError(error.message);
+    }
+    throw error;
+  }
+  return data; // the orders row (existing or newly-inserted)
 }
 
 /* ============================== orderExtras.ts ============================== */
@@ -785,41 +869,41 @@ async function createOrderTx(admin: SupabaseClient, p: CreateOrderParams) {
 type GiftOptions = { wrap: boolean; message: string };
 
 /**
- * Normalises the client's `gift` object. Returns null when there is nothing to
- * store, and NEVER throws — a malformed gift field must not stop an order.
- * Control characters are stripped and the message capped at 300 chars (the same
- * limit the `orders_gift_message_len` constraint enforces).
- */
+ * Normalises the client's `gift` object. Returns null when there is nothing to
+ * store, and NEVER throws — a malformed gift field must not stop an order.
+ * Control characters are stripped and the message capped at 300 chars (the same
+ * limit the `orders_gift_message_len` constraint enforces).
+ */
 function sanitizeGift(raw: unknown): GiftOptions | null {
-    if (!raw || typeof raw !== "object") return null;
-    const r = raw as Record<string, unknown>;
-    const wrap = r.wrap === true;
-    const message = String(r.message ?? "")
-        // deno-lint-ignore no-control-regex
-        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
-        .trim()
-        .slice(0, 300);
-    if (!wrap && !message) return null;
-    return { wrap, message };
+    if (!raw || typeof raw !== "object") return null;
+    const r = raw as Record<string, unknown>;
+    const wrap = r.wrap === true;
+    const message = String(r.message ?? "")
+        // deno-lint-ignore no-control-regex
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+        .trim()
+        .slice(0, 300);
+    if (!wrap && !message) return null;
+    return { wrap, message };
 }
 
 /**
- * Writes the gift options onto an order that already exists. Best effort: by
- * the time this runs the order is created (and, for Razorpay, already paid), so
- * a failure here — e.g. the 2026-10-08 migration not applied yet — is logged and
- * swallowed rather than failing the checkout.
- */
+ * Writes the gift options onto an order that already exists. Best effort: by
+ * the time this runs the order is created (and, for Razorpay, already paid), so
+ * a failure here — e.g. the 2026-10-08 migration not applied yet — is logged and
+ * swallowed rather than failing the checkout.
+ */
 async function saveGiftOptions(admin: SupabaseClient, orderId: string, gift: GiftOptions | null | undefined) {
-    if (!gift) return;
-    try {
-        const { error } = await admin
-            .from("orders")
-            .update({ gift_wrap: gift.wrap, gift_message: gift.message || null })
-            .eq("id", orderId);
-        if (error) console.warn("[gift] could not save gift options:", error.message);
-    } catch (e) {
-        console.warn("[gift] could not save gift options:", e);
-    }
+    if (!gift) return;
+    try {
+        const { error } = await admin
+            .from("orders")
+            .update({ gift_wrap: gift.wrap, gift_message: gift.message || null })
+            .eq("id", orderId);
+        if (error) console.warn("[gift] could not save gift options:", error.message);
+    } catch (e) {
+        console.warn("[gift] could not save gift options:", e);
+    }
 }
 
 // -- guest checkout -----------------------------------------------------------
@@ -828,56 +912,104 @@ async function saveGiftOptions(admin: SupabaseClient, orderId: string, gift: Gif
 // path works unchanged; the only differences are the rules below.
 
 function isGuestUser(user: { is_anonymous?: boolean } | null | undefined): boolean {
-    return user?.is_anonymous === true;
+    return user?.is_anonymous === true;
 }
 
 type ContactProfile = {
-    name?: string | null;
-    email?: string | null;
-    phone?: string | null;
-    address?: unknown;
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: unknown;
 };
 
 /**
- * A guest has no verified email, so the delivery details are the only link
- * between the order and the person. Returns a user-readable message, or null
- * when the profile is complete enough to ship to.
- */
+ * A guest has no verified email, so the delivery details are the only link
+ * between the order and the person. Returns a user-readable message, or null
+ * when the profile is complete enough to ship to.
+ */
 function validateGuestContact(p: ContactProfile | null | undefined): string | null {
-    if (!p) return "Please enter your contact and delivery details.";
-    if (String(p.name || "").trim().length < 2) return "Please enter your name.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(p.email || "").trim())) return "Please enter a valid email address.";
-    const digits = String(p.phone || "").replace(/\D/g, "");
-    if (digits.length < 10 || digits.length > 15) return "Please enter a valid phone number.";
-    const a = (p.address && typeof p.address === "object" ? p.address : {}) as Record<string, unknown>;
-    if (String(a.street || "").trim().length < 3) return "Please enter your street address.";
-    if (!String(a.city || "").trim()) return "Please enter your city.";
-    if (!String(a.state || "").trim()) return "Please enter your state.";
-    if (!/^\d{6}$/.test(String(a.pincode || "").trim())) return "Please enter a valid 6-digit pincode.";
-    return null;
+    if (!p) return "Please enter your contact and delivery details.";
+    if (String(p.name || "").trim().length < 2) return "Please enter your name.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(p.email || "").trim())) return "Please enter a valid email address.";
+    const digits = String(p.phone || "").replace(/\D/g, "");
+    if (digits.length < 10 || digits.length > 15) return "Please enter a valid phone number.";
+    const a = (p.address && typeof p.address === "object" ? p.address : {}) as Record<string, unknown>;
+    if (String(a.street || "").trim().length < 3) return "Please enter your street address.";
+    if (!String(a.city || "").trim()) return "Please enter your city.";
+    if (!String(a.state || "").trim()) return "Please enter your state.";
+    if (!/^\d{6}$/.test(String(a.pincode || "").trim())) return "Please enter a valid 6-digit pincode.";
+    return null;
 }
 
 /**
- * Cash on Delivery is the easiest way to place a fake order, and a guest costs
- * nothing to create. So it is OFF for guests unless the store explicitly turns
- * it on: settings row `paymentSettings` -> data.guestCod = true.
- */
+ * Cash on Delivery is the easiest way to place a fake order, and a guest costs
+ * nothing to create. So it is OFF for guests unless the store explicitly turns
+ * it on: settings row `paymentSettings` -> data.guestCod = true.
+ */
 async function isGuestCodAllowed(admin: SupabaseClient): Promise<boolean> {
-    try {
-        const { data, error } = await admin.from("settings").select("data").eq("id", "paymentSettings").maybeSingle();
-        if (error || !data?.data) return false;
-        return data.data.guestCod === true;
-    } catch (e) {
-        console.warn("[guest] payment settings lookup failed:", e);
-        return false;
-    }
+    try {
+        const { data, error } = await admin.from("settings").select("data").eq("id", "paymentSettings").maybeSingle();
+        if (error || !data?.data) return false;
+        return data.data.guestCod === true;
+    } catch (e) {
+        console.warn("[guest] payment settings lookup failed:", e);
+        return false;
+    }
 }
 
 /** Best-effort caller IP (the platform sets x-forwarded-for). "unknown" when absent. */
 function clientIp(req: Request): string {
-    const fwd = req.headers.get("x-forwarded-for") || "";
-    const first = fwd.split(",")[0]?.trim();
-    return first || req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+    const fwd = req.headers.get("x-forwarded-for") || "";
+    const first = fwd.split(",")[0]?.trim();
+    return first || req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+}
+
+/* ============================== paymentException.ts ============================== */
+// Phase 12 (known issue K-8): a payment that Razorpay CAPTURED but that could not become an order because the last unit sold out between the customer
+// paying and create_order_tx running. Until now the money stayed captured with no order and no trace; finalizeOrder() now calls this BEFORE it rethrows
+// the StockError, so the admin gets a row in `payment_exceptions` (+ a notification) and refunds the payment in the Razorpay dashboard, and the customer is
+// told that a refund is coming.
+//
+// Written in the plain-JavaScript subset of TypeScript (no annotations; this marker is the first line) so its test also runs in a browser on a machine
+// without Node/Deno (tools/browser-test/Run-TsLiteTests.ps1) - the same convention as _shared/refundGateway.ts. The Supabase client is INJECTED.
+// NEVER throws: recording is best-effort and must not hide the original StockError from the caller (the customer still gets the 409).
+
+/** The few fields of the customer's cart worth keeping next to the payment (no prices, no addresses). */
+function summarizeItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.slice(0, 50).map((it) => ({
+    product_id: it && it.productId ? String(it.productId) : "",
+    variant_id: it && it.variantId ? String(it.variantId) : "",
+    quantity: Number(it && it.quantity) || 0,
+    title: it && it.title ? String(it.title).slice(0, 120) : "",
+  }));
+}
+
+/**
+ * @param admin  a service-role Supabase client (only that role may call record_payment_exception)
+ * @param p      { razorpayOrderId, razorpayPaymentId, userId, amount, reason, items }
+ * @returns {{ recorded: boolean, id?: string|null, error?: string }}
+ */
+async function recordUnfulfilledPayment(admin, p) {
+  try {
+    const { data, error } = await admin.rpc("record_payment_exception", {
+      p_razorpay_order_id: p.razorpayOrderId,
+      p_razorpay_payment_id: p.razorpayPaymentId,
+      p_user_id: p.userId || null,
+      p_amount: Number(p.amount) || 0,
+      p_reason: String(p.reason || "").slice(0, 500),
+      p_items: summarizeItems(p.items),
+    });
+    if (error) {
+      // PGRST202 = the cancellation migration (M6) is not applied yet: nothing to record into, and nothing more we can do here
+      console.error("[payment-exception] could not record the payment:", (error && error.message) || error);
+      return { recorded: false, error: (error && error.message) || String(error) };
+    }
+    return { recorded: !!(data && data.recorded), id: (data && data.id) || null };
+  } catch (e) {
+    console.error("[payment-exception] could not record the payment:", e);
+    return { recorded: false, error: (e && e.message) || String(e) };
+  }
 }
 
 /* ============================== finalizeOrder.ts ============================== */
@@ -890,133 +1022,147 @@ function clientIp(req: Request): string {
 // to the same order instead of double-writing stock/stats.
 
 class NoPendingError extends Error {
-    code = "NO_PENDING";
+    code = "NO_PENDING";
 }
 class ForbiddenError extends Error {
-    code = "FORBIDDEN";
+    code = "FORBIDDEN";
 }
 
 type PendingPayload = {
-    userId: string;
-    items: GstLineItem[];
-    subtotal: number;
-    shipping: number;
-    promoDiscount: number;
-    promoCode: string;
-    total: number;
-    taxableTotal: number;
-    totalCgst: number;
-    totalSgst: number;
-    totalIgst: number;
-    isInterState: boolean;
-    /** Optional gift wrap/message captured at checkout (absent on older pending rows). */
-    gift?: GiftOptions | null;
+    userId: string;
+    items: GstLineItem[];
+    subtotal: number;
+    shipping: number;
+    promoDiscount: number;
+    promoCode: string;
+    total: number;
+    taxableTotal: number;
+    totalCgst: number;
+    totalSgst: number;
+    totalIgst: number;
+    isInterState: boolean;
+    /** Optional gift wrap/message captured at checkout (absent on older pending rows). */
+    gift?: GiftOptions | null;
 };
 
 /**
- * @param expectedUid  When called from /verify, the caller may only finalize
- *   THEIR OWN order. The webhook calls without expectedUid — it's trusted via
- *   the Razorpay signature instead.
- */
+ * @param expectedUid  When called from /verify, the caller may only finalize
+ *   THEIR OWN order. The webhook calls without expectedUid — it's trusted via
+ *   the Razorpay signature instead.
+ */
 async function finalizeOrder(admin: SupabaseClient, razorpayOrderId: string, razorpayPaymentId: string, expectedUid?: string) {
-    const { data: pendingRow, error: pendingErr } = await admin
-        .from("pending_orders")
-        .select("*")
-        .eq("id", razorpayOrderId)
-        .maybeSingle();
+    const { data: pendingRow, error: pendingErr } = await admin
+        .from("pending_orders")
+        .select("*")
+        .eq("id", razorpayOrderId)
+        .maybeSingle();
 
-    if (pendingErr) throw pendingErr;
-    if (!pendingRow) {
-        throw new NoPendingError("Order session expired or already processed");
-    }
+    if (pendingErr) throw pendingErr;
+    if (!pendingRow) {
+        throw new NoPendingError("Order session expired or already processed");
+    }
 
-    const pending = pendingRow.payload as PendingPayload;
+    const pending = pendingRow.payload as PendingPayload;
 
-    if (expectedUid && pending.userId !== expectedUid) {
-        throw new ForbiddenError("This order belongs to a different account");
-    }
+    if (expectedUid && pending.userId !== expectedUid) {
+        throw new ForbiddenError("This order belongs to a different account");
+    }
 
-    // Fetch profile details for customer_name/email/phone/address snapshot on
-    // the order row (same denormalization the original wrote onto orderDoc).
-    const { data: profile } = await admin
-        .from("profiles")
-        .select("name, email, phone, address")
-        .eq("id", pending.userId)
-        .maybeSingle();
+    // Fetch profile details for customer_name/email/phone/address snapshot on
+    // the order row (same denormalization the original wrote onto orderDoc).
+    const { data: profile } = await admin
+        .from("profiles")
+        .select("name, email, phone, address")
+        .eq("id", pending.userId)
+        .maybeSingle();
 
-    const order = await createOrderTx(admin, {
-        orderId: razorpayOrderId,
-        userId: pending.userId,
-        items: pending.items,
-        orderStatus: "placed",
-        paymentStatus: "paid",
-        paymentMethod: "Razorpay",
-        source: "online",
-        customerName: profile?.name || "User",
-        customerEmail: profile?.email || "",
-        customerPhone: profile?.phone || "",
-        address: profile?.address ?? null,
-        subtotal: pending.subtotal,
-        shipping: pending.shipping,
-        cgst: pending.totalCgst,
-        sgst: pending.totalSgst,
-        igst: pending.totalIgst,
-        promoCode: pending.promoCode,
-        promoDiscount: pending.promoDiscount,
-        total: pending.total,
-        razorpayOrderId,
-        razorpayPaymentId,
-    });
+    const order = await createOrderTx(admin, {
+        orderId: razorpayOrderId,
+        userId: pending.userId,
+        items: pending.items,
+        orderStatus: "placed",
+        paymentStatus: "paid",
+        paymentMethod: "Razorpay",
+        source: "online",
+        customerName: profile?.name || "User",
+        customerEmail: profile?.email || "",
+        customerPhone: profile?.phone || "",
+        address: profile?.address ?? null,
+        subtotal: pending.subtotal,
+        shipping: pending.shipping,
+        cgst: pending.totalCgst,
+        sgst: pending.totalSgst,
+        igst: pending.totalIgst,
+        promoCode: pending.promoCode,
+        promoDiscount: pending.promoDiscount,
+        total: pending.total,
+        razorpayOrderId,
+        razorpayPaymentId,
+    }).catch(async (e: unknown) => {
+        // The payment is CAPTURED but the order cannot exist (an item sold out meanwhile, K-8): leave a trace for the admin - who refunds it in the
+        // Razorpay dashboard - and tell the customer, BEFORE the caller answers 409. Never masks the original error.
+        if (e instanceof StockError) {
+            await recordUnfulfilledPayment(admin, {
+                razorpayOrderId,
+                razorpayPaymentId,
+                userId: pending.userId,
+                amount: pending.total,
+                reason: e.message,
+                items: pending.items,
+            });
+        }
+        throw e;
+    });
 
-    // Gift options ride along in the pending payload; applied once the order
-    // exists. Safe to repeat — /verify and the webhook may both reach this point.
-    await saveGiftOptions(admin, order.id as string, pending.gift);
+    // Gift options ride along in the pending payload; applied once the order
+    // exists. Safe to repeat — /verify and the webhook may both reach this point.
+    await saveGiftOptions(admin, order.id as string, pending.gift);
 
-    // Best-effort bookkeeping so the cleanup cron's `status = 'created'` filter
-    // never sweeps up an order that already finalized. create_order_tx's own
-    // idempotency is the real guard, not this flag.
-    await admin.from("pending_orders").update({ status: "finalized" }).eq("id", razorpayOrderId);
+    // Best-effort bookkeeping so the cleanup cron's `status = 'created'` filter
+    // never sweeps up an order that already finalized. create_order_tx's own
+    // idempotency is the real guard, not this flag.
+    await admin.from("pending_orders").update({ status: "finalized" }).eq("id", razorpayOrderId);
 
-    return order.id as string;
+    return order.id as string;
 }
 
 /* ============================== function logic (index.ts) ============================== */
 // Port of functions/routes/payment.js POST /verify.
 
 Deno.serve(async (req) => {
-    const preflight = handlePreflight(req);
-    if (preflight) return preflight;
-    const methodErr = methodNotAllowed(req, ["POST"]);
-    if (methodErr) return methodErr;
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
+  const methodErr = methodNotAllowed(req, ["POST"]);
+  if (methodErr) return methodErr;
 
-    const admin = supabaseAdmin();
+  const admin = supabaseAdmin();
 
-    try {
-        const auth = await requireAuth(req);
-        if (!auth.user) return auth.error;
+  try {
+    const auth = await requireAuth(req);
+    if (!auth.user) return auth.error;
 
-        if (!(await rateLimit(admin, `verify:${auth.user.id}`, 30, 60000, { failOpen: false }))) {
-            return jsonResponse(req, 429, { success: false, verified: false, error: "Too many requests. Please wait a moment." });
-        }
+    if (!(await rateLimit(admin, `verify:${auth.user.id}`, 30, 60000, { failOpen: false }))) {
+      return jsonResponse(req, 429, { success: false, verified: false, error: "Too many requests. Please wait a moment." });
+    }
 
-        const { json: body } = await readBody(req);
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body || {};
-        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-            return jsonResponse(req, 400, { success: false, verified: false, error: "Missing payment fields" });
-        }
+    const { json: body } = await readBody(req);
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body || {};
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return jsonResponse(req, 400, { success: false, verified: false, error: "Missing payment fields" });
+    }
 
-        const verified = await verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
-        if (!verified) {
-            return jsonResponse(req, 400, { success: false, verified: false, error: "Invalid signature" });
-        }
+    const verified = await verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    if (!verified) {
+      return jsonResponse(req, 400, { success: false, verified: false, error: "Invalid signature" });
+    }
 
-        // Signature valid → finalize from the server-stored pending copy. Passing
-        // the authenticated uid means a user can only finalize their own order.
-        const orderId = await finalizeOrder(admin, razorpay_order_id, razorpay_payment_id, auth.user.id);
-        return jsonResponse(req, 200, { success: true, verified: true, paymentId: razorpay_payment_id, orderId });
-    } catch (err) {
-        console.error("[payment-verify] failed:", err);
-        const status = err instanceof StockError ? 409 : err instanceof NoPendingError ? 410 : err instanceof ForbiddenError ? 403 : 500;
-        return jsonResponse(req, status, { success: false, verified: false, error: (err as Error).message || "Could not finalize order" });
-    }
+    // Signature valid → finalize from the server-stored pending copy. Passing
+    // the authenticated uid means a user can only finalize their own order.
+    const orderId = await finalizeOrder(admin, razorpay_order_id, razorpay_payment_id, auth.user.id);
+    return jsonResponse(req, 200, { success: true, verified: true, paymentId: razorpay_payment_id, orderId });
+  } catch (err) {
+    console.error("[payment-verify] failed:", err);
+    const status = err instanceof StockError ? 409 : err instanceof NoPendingError ? 410 : err instanceof ForbiddenError ? 403 : 500;
+    return jsonResponse(req, status, { success: false, verified: false, error: (err as Error).message || "Could not finalize order" });
+  }
 });

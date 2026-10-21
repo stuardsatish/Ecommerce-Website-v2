@@ -7,12 +7,12 @@ import userReducer from "./UserSlice";
 import wishlistReducer from "./WishlistSlice"
 
 export const store = configureStore({
-    reducer: {
-        products: prodcutsReducer,
-        cart: cartReducer,
-        theme: themeReducer,
-        loading: loadingReducer,
-        user: userReducer,
-        wishlist: wishlistReducer,
-    },
+    reducer: {
+        products: prodcutsReducer,
+        cart: cartReducer,
+        theme: themeReducer,
+        loading: loadingReducer,
+        user: userReducer,
+        wishlist: wishlistReducer,
+    },
 });

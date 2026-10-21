@@ -3,23 +3,23 @@
  *
  * Responsibilities
  * ----------------
- *  • Generates one `:root[data-theme=..][data-mode=..] { --color-*: … }` CSS
- *    block per theme/mode from ./themes.js and injects it once into <head>.
- *    (This is exactly the CSS-variable structure described in the spec, but
- *     generated from the single source of truth so the two can never drift.)
- *  • Sets `data-theme` and `data-mode` on <html>, so the correct block wins
- *    via the CSS cascade. Switching themes = changing two attributes; no
- *    per-property JS thrash, and it works for CSS-only consumers too.
- *  • Persists the user's choice to localStorage.
- *  • Defaults `mode` to the OS preference (prefers-color-scheme) and `theme`
- *    to DEFAULT_THEME, and live-follows the OS until the user picks a mode.
+ *  • Generates one `:root[data-theme=..][data-mode=..] { --color-*: … }` CSS
+ *    block per theme/mode from ./themes.js and injects it once into <head>.
+ *    (This is exactly the CSS-variable structure described in the spec, but
+ *     generated from the single source of truth so the two can never drift.)
+ *  • Sets `data-theme` and `data-mode` on <html>, so the correct block wins
+ *    via the CSS cascade. Switching themes = changing two attributes; no
+ *    per-property JS thrash, and it works for CSS-only consumers too.
+ *  • Persists the user's choice to localStorage.
+ *  • Defaults `mode` to the OS preference (prefers-color-scheme) and `theme`
+ *    to DEFAULT_THEME, and live-follows the OS until the user picks a mode.
  *
  * Consuming colors
  * ----------------
- *  • In JSX: just use semantic Tailwind classes — `bg-primary`, `text-error`…
- *  • In JS/GSAP/canvas: call `readCssColor('primary')` (reads the live CSS
- *    variable, so it always matches the active theme/mode), or use the
- *    `useThemeColor()` / `useThemeColors()` hooks which re-read on change.
+ *  • In JSX: just use semantic Tailwind classes — `bg-primary`, `text-error`…
+ *  • In JS/GSAP/canvas: call `readCssColor('primary')` (reads the live CSS
+ *    variable, so it always matches the active theme/mode), or use the
+ *    `useThemeColor()` / `useThemeColors()` hooks which re-read on change.
  */
 import {
     createContext,
@@ -50,7 +50,7 @@ function buildThemeCss() {
             const values = themes[themeName]?.[mode];
             if (!values) continue;
             const decls = TOKEN_NAMES.map(
-                (token) => `  --color-${token}: ${values[token] ?? "initial"};`
+                (token) => `  --color-${token}: ${values[token] ?? "initial"};`
             ).join("\n");
             css += `:root[data-theme="${themeName}"][data-mode="${mode}"] {\n${decls}\n}\n`;
         }
@@ -119,7 +119,7 @@ function readStored() {
 /**
  * Read a resolved theme color from the live CSS variables.
  * Always reflects the currently-active theme + mode.
- * @param {string} token  e.g. "primary", "text-muted", "chart-1"
+ * @param {string} token  e.g. "primary", "text-muted", "chart-1"
  * @param {string} [fallback]
  * @returns {string} e.g. "#A43B31"
  */

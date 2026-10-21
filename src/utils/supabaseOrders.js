@@ -1,15 +1,17 @@
+import { mapShipmentRows } from "../features/orders/shipmentModel"
+
 // Maps `orders` + `order_items` rows (snake_case, per 01-schema.sql) to the
 // camelCase shape the rest of the app was built around when orders lived in
 // Firestore. All reads from the orders table should go through this normalizer.
 //
 // IMPORTANT — resolvedFinalPrice compatibility:
-//   AdminOrdersPage has a `resolvedFinalPrice` helper that detects an old
-//   Firestore-backend bug where finalPrice was stored equal to the MRP.
-//   It fires when `disc > 0 && stored >= mrp && mrp > 0`. To prevent that
-//   branch from double-discounting Supabase order items (where unit_price IS
-//   already the correct post-discount price), we intentionally do NOT expose a
-//   `price` field on mapped items so that mrp resolves to 0 and the condition
-//   `mrp > 0` stays false. `finalPrice` alone is enough for every UI consumer.
+//   AdminOrdersPage has a `resolvedFinalPrice` helper that detects an old
+//   Firestore-backend bug where finalPrice was stored equal to the MRP.
+//   It fires when `disc > 0 && stored >= mrp && mrp > 0`. To prevent that
+//   branch from double-discounting Supabase order items (where unit_price IS
+//   already the correct post-discount price), we intentionally do NOT expose a
+//   `price` field on mapped items so that mrp resolves to 0 and the condition
+//   `mrp > 0` stays false. `finalPrice` alone is enough for every UI consumer.
 export const mapOrderRow = (row) => {
   if (!row) return row
   const items = (row.order_items || []).map((it) => ({
@@ -22,6 +24,24 @@ export const mapOrderRow = (row) => {
     finalPrice: Number(it.unit_price) || 0,
     discount: Number(it.discount) || 0,
     lineTotal: Number(it.line_total) || 0,
+
+    // ── Purchase-time snapshot (migration 20261014_01). Pre-migration rows have none of this (all undefined/empty).
+    // order_items.id is THE key for everything after delivery (return / exchange / refund of ONE line).
+    id: it.id || null,
+    // 'single' | 'main' | 'variant' (the product page option that was bought); '' for rows older than the migration
+    itemType: it.item_type || "",
+    sku: it.sku || "",
+    productTitle: it.product_title || "",
+    snapshotImage: it.image || "",
+    snapshotSource: it.snapshot_source || "",   // 'order' (exact) | 'backfill' (reconstructed from the title)
+    // The return / exchange policy that applied when it was bought (null = unknown/legacy -> use the product's)
+    policy: it.return_enabled == null && it.exchange_enabled == null ? null : {
+      returnEnabled: it.return_enabled !== false,
+      returnWindowDays: it.return_window_days ?? null,
+      exchangeEnabled: it.exchange_enabled !== false,
+      exchangeWindowDays: it.exchange_window_days ?? null,
+    },
+    // NB: still NO `price` / `mrp` field — see the resolvedFinalPrice note at the top of this file.
   }))
 
   // address is jsonb in Supabase — expose under all aliases the UI checks.
@@ -66,6 +86,12 @@ export const mapOrderRow = (row) => {
 
     // order_items mapped to `products` (UI-facing name for the line-items array)
     products: items,
+
+    // ── Shipping (migration 20261017_03_shipping.sql). All empty / null on a server without it or for rows nobody shipped yet.
+    // delivered_at anchors every return / exchange window; `deliveredAtSource === 'backfill_updated_at'` means it is only approximate.
+    deliveredAt: row.delivered_at || null,
+    deliveredAtSource: row.delivered_at_source || "",
+    shipments: mapShipmentRows(row.shipments),
   }
 }
 

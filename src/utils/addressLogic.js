@@ -40,7 +40,7 @@ export function emptyAddressFields(seed = {}) {
 /**
  * @param {object} fields camelCase form values
  * @returns {{ ok: boolean, errors: Record<string,string>, values: object }}
- *   `values` is the trimmed/normalised copy that should be sent to the DB.
+ *   `values` is the trimmed/normalised copy that should be sent to the DB.
  */
 export function validateAddress(fields) {
     const f = fields || {}

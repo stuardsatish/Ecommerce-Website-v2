@@ -9,10 +9,10 @@ import { getInvoiceSettings } from "../../services/settingsService"
  * Question set and answer copy are shared verbatim with the mobile app's
  * `(app)/support/faq.jsx`, so the two apps answer the same question the same
  * way. Every answer describes what the apps can ACTUALLY do today:
- *   - Cancellation says "contact us" — no self-service cancel exists yet
- *     (roadmap Phase 6), matching the Refund Policy's own honest wording.
- *   - Payment methods are the three really supported (Razorpay / COD /
- *     WhatsApp-assisted), each admin-toggleable, hence "where enabled".
+ *   - Cancellation says "contact us" — no self-service cancel exists yet
+ *     (roadmap Phase 6), matching the Refund Policy's own honest wording.
+ *   - Payment methods are the three really supported (Razorpay / COD /
+ *     WhatsApp-assisted), each admin-toggleable, hence "where enabled".
  *
  * Support email/phone read from the admin-configurable `invoiceSettings` row —
  * same source as the Contact page and the Refund Policy.
@@ -38,7 +38,7 @@ const FAQS = [
     },
     {
         q: "How do returns and refunds work?",
-        a: "If something arrives damaged, incorrect, or not as described, contact us within 7 days of delivery with your order number and we'll arrange a replacement or refund. Approved refunds on online payments go back to the original payment method via Razorpay, typically within 5–7 business days.",
+        a: "If something arrives damaged, incorrect, or not as described, contact us within the return window shown on the product page, with your order number, and we'll arrange a replacement or refund. Approved refunds on online payments go back to the original payment method via Razorpay, typically within 5–7 business days.",
         link: { to: "/refund-policy", label: "See the Refund Policy for full details" },
     },
     {

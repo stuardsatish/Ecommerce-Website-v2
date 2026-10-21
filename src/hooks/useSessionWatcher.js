@@ -9,9 +9,9 @@ import { getLocalSessionId, forceLogout, inSessionGrace } from "../utils/session
  * user's id.
  *
  * Important safety properties (so a normal login never logs itself out):
- *  - the local id is read fresh on every event (not captured once),
- *  - a logout only fires when BOTH ids exist and differ,
- *  - mismatches during the post-login grace window are ignored.
+ *  - the local id is read fresh on every event (not captured once),
+ *  - a logout only fires when BOTH ids exist and differ,
+ *  - mismatches during the post-login grace window are ignored.
  *
  * @param {string|null|undefined} uid
  */

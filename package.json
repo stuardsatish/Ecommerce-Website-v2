@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test:unit": "node --test \"src/**/__tests__/*.test.mjs\"",
+    "build:import-template": "node scripts/build-import-template.mjs",
     "preview": "vite preview",
     "deploy": "vite build && npx vercel --prod"
   },
