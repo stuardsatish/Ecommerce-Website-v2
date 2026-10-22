@@ -6,7 +6,7 @@
 // characters are removed; numbers accept 500 / 500.00 / ₹500 / 1,500.
 
 // eslint-disable-next-line no-misleading-character-class
-const ZERO_WIDTH = /[-‍⁠﻿]/g
+const ZERO_WIDTH = /[‍⁠﻿]/g
 const NBSP_LIKE = /[   ]/g
 
 /** Excel hands back numbers for numeric cells and strings for text; everything becomes a string here. */
