@@ -14,16 +14,24 @@ import { mapShipmentRows } from "../features/orders/shipmentModel"
 //   `mrp > 0` stays false. `finalPrice` alone is enough for every UI consumer.
 export const mapOrderRow = (row) => {
   if (!row) return row
-  const items = (row.order_items || []).map((it) => ({
-    productId: it.product_id,
-    variantId: it.variant_id || null,
-    variantName: it.variant_name || null,
-    title: it.title || "",
-    quantity: Number(it.quantity) || 1,
-    // unit_price is the final charged price per unit (already discounted).
-    finalPrice: Number(it.unit_price) || 0,
-    discount: Number(it.discount) || 0,
-    lineTotal: Number(it.line_total) || 0,
+  const items = (row.order_items || []).map((it) => {
+    const unitPrice = Number(it.unit_price ?? it.price ?? it.final_price ?? 0)
+    const qty = Number(it.quantity) || 1
+    const lineTotal = Number(it.line_total) || (unitPrice * qty)
+    const effectivePrice = unitPrice > 0 ? unitPrice : (lineTotal > 0 && qty > 0 ? lineTotal / qty : 0)
+
+    return {
+      productId: it.product_id,
+      variantId: it.variant_id || null,
+      variantName: it.variant_name || null,
+      title: it.title || "",
+      quantity: qty,
+      // unit_price is the final charged price per unit (already discounted).
+      finalPrice: effectivePrice,
+      price: effectivePrice,
+      unitPrice: effectivePrice,
+      discount: Number(it.discount) || 0,
+      lineTotal: lineTotal,
 
     // ── Purchase-time snapshot (migration 20261014_01). Pre-migration rows have none of this (all undefined/empty).
     // order_items.id is THE key for everything after delivery (return / exchange / refund of ONE line).
@@ -42,7 +50,10 @@ export const mapOrderRow = (row) => {
       exchangeWindowDays: it.exchange_window_days ?? null,
     },
     // NB: still NO `price` / `mrp` field — see the resolvedFinalPrice note at the top of this file.
-  }))
+  }})
+
+  const itemsTotal = items.reduce((sum, it) => sum + (it.lineTotal || it.finalPrice * it.quantity), 0)
+  const orderTotal = Number(row.total ?? row.total_amount ?? 0) || itemsTotal
 
   // address is jsonb in Supabase — expose under all aliases the UI checks.
   const addr = row.address
@@ -71,7 +82,8 @@ export const mapOrderRow = (row) => {
     // financial fields
     subtotal: Number(row.subtotal) || 0,
     shipping: Number(row.shipping) || 0,
-    total: Number(row.total) || 0,
+    total: orderTotal,
+    totalAmount: orderTotal,
     promoCode: row.promo_code || "",
     promoDiscount: Number(row.promo_discount) || 0,
 

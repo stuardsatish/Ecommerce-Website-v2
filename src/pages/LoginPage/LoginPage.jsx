@@ -122,7 +122,7 @@ const LoginPage = () => {
 
       broadcastAuth("login", { role: profile.role, userId: data.user.id });
       toast.success("Welcome back ");
-      if (profile.role === "admin") navigate("/admin/myorders");
+      if (profile.role === "admin") navigate("/admin/dashboard");
       else navigate("/");
     } catch (error) {
       toast.error(getAuthErrorMessage(error));

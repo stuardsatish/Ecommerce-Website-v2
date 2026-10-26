@@ -2,6 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Outfit:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
@@ -9,6 +10,38 @@
 @import "@fontsource/caveat/600.css";
 
 @import "tailwindcss";
+
+/* ── ADMIN LAYOUT — scoped to .admin-layout to avoid leaking into the
+   customer-facing storefront. Mirrors the Pelago design system colours. ── */
+.admin-layout {
+  --adm-teal:        #104945;
+  --adm-teal-dark:   #0c3936;
+  --adm-teal-bg:     #E8F3F1;
+  --adm-canvas:      #EDE8E1;
+  --adm-white:       #FFFFFF;
+  --adm-border:      #E2DBD0;
+  --adm-muted:       #78716C;
+  --adm-ink:         #1C1917;
+  --adm-sidebar-bg:  #FFFFFF;
+  --adm-card-bg:     #FFFFFF;
+  --adm-card-border: #E4DDD3;
+  --adm-font:        'Plus Jakarta Sans', 'Inter', sans-serif;
+}
+
+/* Prevent admin canvas background from being overridden by Navbar's
+   document.body.style.background assignment when on admin routes */
+body:has(.admin-layout) {
+  background: #EDE8E1 !important;
+}
+
+/* Admin pages need their own scrolling — remove the padded bottom from
+   the mobile nav reservation since admin routes use the sidebar */
+@media (max-width: 767px) {
+  body:has(.admin-layout) {
+    padding-bottom: 0;
+  }
+}
+
 
 @theme {
     --color-blue-50: #DFDFF0;

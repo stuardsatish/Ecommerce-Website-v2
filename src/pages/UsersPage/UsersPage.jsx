@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from "react"
+﻿import { useEffect, useState, useRef, useMemo } from "react"
 import { supabase } from "../../context/SupabaseConfig"
 import { toast } from "react-toastify"
 import {
@@ -366,404 +366,302 @@ const UsersPage = () => {
   }
   const menuItem = "w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-[var(--color-surface-muted)] transition-colors capitalize"
 
-  /* ============================== LOADING ============================== */
+  /* ============================== LOADING SKELETON ============================== */
   if (loading) {
-    const bar = (style) => <div aria-hidden="true" className="animate-pulse" style={{ background: "var(--color-surface-muted)", borderRadius: "8px", ...style }} />
+    const skel = (w = "80px", h = "14px", r = "6px") => (
+      <div className="animate-pulse" style={{ width: w, height: h, borderRadius: r, background: "#E9E4DD" }} />
+    )
     return (
-      <div className="relative min-h-screen overflow-x-hidden" style={{ background: "var(--color-background)", fontFamily: INTER }} aria-busy="true">
-        <div className="flex flex-col p-10 pt-[96px] sm:pt-10" style={{ gap: "24px" }}>
-          {/* SECTION 1 — STAT CARDS */}
-          <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: "24px" }}>
-            {[...Array(4)].map((_, i) => (
-              <div key={i} style={{ ...glassCard, borderRadius: "32px", padding: "24px", height: "170px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                <div className="flex items-start justify-between">
-                  {bar({ width: "46px", height: "46px", borderRadius: "16px" })}
-                  {bar({ width: "48px", height: "16px" })}
-                </div>
-                <div className="flex flex-col" style={{ gap: "8px" }}>
-                  {bar({ width: "60%", height: "12px" })}
-                  {bar({ width: "45%", height: "30px" })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* FILTER BAR */}
-          <div className="flex items-center justify-between" style={{ ...glassCard, borderRadius: "16px", padding: "16px" }}>
-            <div className="flex flex-wrap items-center" style={{ gap: "12px" }}>
-              {bar({ width: "256px", height: "45px", borderRadius: "48px" })}
-              {bar({ width: "96px", height: "40px", borderRadius: "48px" })}
-              {bar({ width: "96px", height: "40px", borderRadius: "48px" })}
-              {bar({ width: "120px", height: "40px", borderRadius: "48px" })}
+      <div style={{ padding: "20px 24px", fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>
+        {/* KPI row skeleton */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "12px", marginBottom: "24px" }}>
+          {[0,1,2,3,4,5].map(i => (
+            <div key={i} style={{ background: "#fff", border: "1px solid #E6E0D8", borderRadius: "16px", padding: "16px", height: "90px" }}>
+              {skel("70%", "11px")} <div style={{ marginTop: "16px" }}>{skel("50%", "22px", "8px")}</div>
             </div>
-            <div className="flex items-center" style={{ gap: "12px" }}>
-              {bar({ width: "88px", height: "40px", borderRadius: "48px" })}
-              {bar({ width: "100px", height: "40px", borderRadius: "48px" })}
+          ))}
+        </div>
+        {/* Table skeleton */}
+        <div style={{ background: "#fff", border: "1px solid #E6E0D8", borderRadius: "16px", overflow: "hidden" }}>
+          <div style={{ padding: "16px 24px", borderBottom: "1px solid #EFECE6" }}>{skel("200px", "14px")}</div>
+          {[0,1,2,3,4,5].map(i => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: "16px", padding: "14px 24px", borderBottom: "1px solid #F2EFEA" }}>
+              <div className="animate-pulse" style={{ width: "36px", height: "36px", borderRadius: "50%", background: "#E9E4DD", flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>{skel("60%", "13px")}</div>
+              {skel("80px", "12px")} {skel("60px", "12px")} {skel("40px", "12px")} {skel("70px", "12px")}
             </div>
-          </div>
-
-          {/* TABLE */}
-          <div style={{ background: "var(--color-surface)", border: "1px solid color-mix(in srgb, var(--color-border) 10%, transparent)", boxShadow: "0px 8px 32px rgba(139,92,246,0.08)", borderRadius: "32px", padding: "32px" }}>
-            <div className="flex items-center justify-between" style={{ marginBottom: "24px" }}>
-              {bar({ width: "220px", height: "32px" })}
-              {bar({ width: "90px", height: "16px" })}
-            </div>
-            {/* Column headers */}
-            <div className="flex items-center" style={{ gap: "24px", paddingBottom: "16px", borderBottom: "1px solid color-mix(in srgb, var(--color-border) 20%, transparent)" }}>
-              <div style={{ minWidth: "232px", flex: 2 }}>{bar({ width: "120px", height: "12px" })}</div>
-              {[...Array(5)].map((_, i) => (
-                <div key={i} style={{ flex: 1 }}>{bar({ width: "70px", height: "12px" })}</div>
-              ))}
-              <div style={{ width: "40px" }} />
-            </div>
-            {/* Rows */}
-            {[...Array(8)].map((_, r) => (
-              <div key={r} className="flex items-center" style={{ gap: "24px", padding: "24px 0", borderTop: "1px solid color-mix(in srgb, var(--color-border) 10%, transparent)" }}>
-                <div className="flex items-center" style={{ gap: "16px", minWidth: "232px", flex: 2 }}>
-                  {bar({ width: "48px", height: "48px", borderRadius: "9999px", flexShrink: 0 })}
-                  <div className="flex flex-col" style={{ gap: "6px", flex: 1 }}>
-                    {bar({ width: "70%", height: "16px" })}
-                    {bar({ width: "40%", height: "12px" })}
-                  </div>
-                </div>
-                <div style={{ flex: 1 }}>{bar({ width: "80%", height: "14px" })}</div>
-                <div style={{ flex: 1 }}>{bar({ width: "70%", height: "14px" })}</div>
-                <div style={{ flex: 1 }}>{bar({ width: "56px", height: "22px", borderRadius: "9999px" })}</div>
-                <div style={{ flex: 1 }}>{bar({ width: "68px", height: "22px", borderRadius: "9999px" })}</div>
-                <div style={{ flex: 1 }}>{bar({ width: "60%", height: "14px" })}</div>
-                <div style={{ width: "40px" }}>{bar({ width: "24px", height: "24px", borderRadius: "9999px" })}</div>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
     )
   }
 
   /* ============================== RENDER ============================== */
-  return (
-    <div ref={containerRef} className="relative min-h-screen overflow-x-hidden" style={{ background: "var(--color-background)", fontFamily: INTER }}>
-      {/* Main content — shifts left when the drawer is open */}
-      <div
-        className="flex flex-col p-10 pt-[96px] sm:pt-10"
-        style={{ gap: "24px", transition: "margin-right 0.35s ease", marginRight: drawerOpen ? "424px" : "0px" }}
-      >
-        {/* ---------------- SECTION 1 — STATS (all four in one row) ---------------- */}
-        <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: "24px" }}>
-          {cards.map((c) => {
-            const Icon = c.icon
-            return (
-              <div key={c.label} className="stat-card flex flex-col justify-between" style={{ ...glassCard, borderRadius: "32px", padding: "24px", height: "170px" }}>
-                <div className="flex items-start justify-between">
-                  <div style={{ background: "color-mix(in srgb, var(--color-accent) 10%, transparent)", borderRadius: "16px", padding: "12px" }}>
-                    <Icon size={22} style={{ color: "var(--color-primary)" }} />
-                  </div>
-                  <div className="flex items-center" style={{ gap: "4px" }}>
-                    {c.dir === "up" && <ArrowUp size={13} style={{ color: "var(--color-success)" }} />}
-                    {c.dir === "down" && <ArrowDown size={13} style={{ color: "var(--color-error)" }} />}
-                    <span style={{ fontSize: "16px", color: c.dir === "up" ? "var(--color-success)" : c.dir === "down" ? "var(--color-error)" : "var(--color-body)" }}>{c.trend}</span>
-                  </div>
-                </div>
-                <div className="flex flex-col" style={{ gap: "4px" }}>
-                  <span style={{ fontWeight: 600, fontSize: "12px", color: "var(--color-body)", letterSpacing: "1.2px", textTransform: "uppercase" }}>{c.label}</span>
-                  <span style={{ fontWeight: 600, fontSize: "32px", color: "var(--color-ink)", letterSpacing: "1.6px" }}>{c.value.toLocaleString()}</span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+  // Pelago design tokens
+  const TEAL   = "#104945"
+  const TEAL_L = "#DDF0EB"
+  const WHITE  = "#FFFFFF"
+  const BORDER = "#E6E0D8"
+  const STONE  = "#FAF8F5"
+  const INK    = "#171412"
+  const MUTED  = "#78716C"
+  const FONT   = "'Plus Jakarta Sans','Inter',sans-serif"
 
-        {/* ---------------- SECTION 3 — FILTER BAR ---------------- */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3" style={{ ...glassCard, borderRadius: "16px", padding: "16px", position: "relative", zIndex: 36 }}>
-          {/* Left controls */}
-          <div className="flex flex-wrap items-center" style={{ gap: "12px" }}>
-            <div className="relative">
-              <Search size={16} className="absolute" style={{ left: "16px", top: "50%", transform: "translateY(-50%)", color: "var(--color-muted)" }} />
+  // Avatar colour buckets (warm Pelago palette)
+  const avatarColor = (name) => {
+    const palettes = [
+      { bg: "#F6DDCC", fg: "#93441A" }, { bg: "#FAECD6", fg: "#8E5C1E" },
+      { bg: "#FBDBE4", fg: "#9B294C" }, { bg: "#DCF1EB", fg: "#1C695A" },
+      { bg: "#DBE8F1", fg: "#215A7F" }, { bg: "#DDF0EB", fg: "#0F4C4C" },
+      { bg: "#E9E4F0", fg: "#5B3F8A" }, { bg: "#FDE8D8", fg: "#A0410D" },
+    ]
+    let h = 0
+    for (let i = 0; i < (name || "?").length; i++) h = (name.charCodeAt(i) + ((h << 5) - h)) | 0
+    return palettes[Math.abs(h) % palettes.length]
+  }
+
+  // Status pill style
+  const statusStyle = (s) => ({
+    confirmed: { bg: "#FEF3C7", color: "#92400E" },
+    active:    { bg: "#DDF0EB", color: "#0F4C4C" },
+    pending:   { bg: "#FEF3C7", color: "#92400E" },
+    suspended: { bg: "#FEE2E2", color: "#991B1B" },
+    inactive:  { bg: "#F3F4F6", color: "#374151" },
+  })[s] || { bg: "#F3F4F6", color: "#374151" }
+
+  return (
+    <div ref={containerRef} style={{ fontFamily: FONT, padding: "20px 24px 40px" }}>
+
+      {/* ── KPI Cards ─────────────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "12px", marginBottom: "20px" }}>
+        {[
+          { label: "Total Users",       value: totalUsers       },
+          { label: "New (30 days)",      value: newRegistrations },
+          { label: "Administrators",     value: adminCount       },
+          { label: "Active Users",       value: activeCount      },
+        ].map(card => (
+          <div key={card.label} style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: "16px", padding: "14px 16px", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+            <div style={{ fontSize: "11px", fontWeight: 600, color: MUTED, marginBottom: "10px" }}>{card.label}</div>
+            <div style={{ fontSize: "22px", fontWeight: 800, color: INK, lineHeight: 1 }}>{card.value.toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Main table card ───────────────────────────────────── */}
+      <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+
+        {/* Table toolbar */}
+        <div style={{ padding: "14px 20px", borderBottom: `1px solid #EFECE6`, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+            {/* Search */}
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#A8A29E" }}>
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </span>
               <input
                 value={filterSearch}
                 onChange={(e) => setFilterSearch(e.target.value)}
-                placeholder="Filter roster..."
-                className="outline-none"
-                style={{ width: "256px", maxWidth: "100%", height: "45px", background: "var(--color-surface-muted)", border: "1px solid color-mix(in srgb, var(--color-border) 30%, transparent)", borderRadius: "48px", padding: "12px 16px 12px 40px", fontSize: "14px", color: "var(--color-ink)" }}
+                placeholder="Search name or email…"
+                style={{ width: "240px", paddingLeft: "30px", paddingRight: "10px", height: "32px", fontSize: "12.5px", border: `1px solid #D8D2C9`, borderRadius: "999px", background: WHITE, color: INK, fontFamily: FONT, outline: "none" }}
               />
             </div>
 
-            {/* Role */}
-            <div className="relative">
-              <button onClick={() => setOpenMenu(openMenu === "role" ? null : "role")} className="flex items-center" style={{ ...pillBtn, gap: "8px" }}>
-                <Filter size={16} /> {roleFilter === "all" ? "Role" : roleFilter[0].toUpperCase() + roleFilter.slice(1)}
-              </button>
-              {openMenu === "role" && (
-                <div style={{ ...menuStyle, left: 0 }}>
-                  {ROLE_OPTIONS.map((r) => (
-                    <button key={r} className={menuItem} style={{ color: roleFilter === r ? "var(--color-primary)" : "var(--color-body)", fontWeight: roleFilter === r ? 600 : 400 }}
-                      onClick={() => { setRoleFilter(r); setOpenMenu(null) }}>{r === "all" ? "All Roles" : r}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Status */}
-            <div className="relative">
-              <button onClick={() => setOpenMenu(openMenu === "status" ? null : "status")} className="flex items-center" style={{ ...pillBtn, gap: "8px" }}>
-                <CircleDot size={16} /> {statusFilter === "all" ? "Status" : statusFilter[0].toUpperCase() + statusFilter.slice(1)}
-              </button>
-              {openMenu === "status" && (
-                <div style={{ ...menuStyle, left: 0 }}>
-                  {STATUS_OPTIONS.map((s) => (
-                    <button key={s} className={menuItem} style={{ color: statusFilter === s ? "var(--color-primary)" : "var(--color-body)", fontWeight: statusFilter === s ? 600 : 400 }}
-                      onClick={() => { setStatusFilter(s); setOpenMenu(null) }}>{s === "all" ? "All Statuses" : s}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Date Range */}
-            <div className="relative">
-              <button onClick={() => setOpenMenu(openMenu === "date" ? null : "date")} className="flex items-center" style={{ ...pillBtn, gap: "8px", ...(dateStart || dateEnd ? { color: "var(--color-primary)", borderColor: "color-mix(in srgb, var(--color-accent) 30%, transparent)" } : null) }}>
-                <Calendar size={16} /> Date Range
-              </button>
-              {openMenu === "date" && (
-                <div style={{ ...menuStyle, left: 0, minWidth: "240px" }} className="flex flex-col gap-3 p-4">
-                  <label className="flex flex-col gap-1" style={{ fontSize: "12px", color: "var(--color-muted)" }}>
-                    From
-                    <input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} className="outline-none" style={{ border: "1px solid color-mix(in srgb, var(--color-border) 40%, transparent)", borderRadius: "10px", padding: "8px 10px", fontSize: "13px", color: "var(--color-ink)" }} />
-                  </label>
-                  <label className="flex flex-col gap-1" style={{ fontSize: "12px", color: "var(--color-muted)" }}>
-                    To
-                    <input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} className="outline-none" style={{ border: "1px solid color-mix(in srgb, var(--color-border) 40%, transparent)", borderRadius: "10px", padding: "8px 10px", fontSize: "13px", color: "var(--color-ink)" }} />
-                  </label>
-                  <button onClick={() => { setDateStart(""); setDateEnd("") }} className="text-sm" style={{ color: "var(--color-primary)", fontWeight: 600 }}>Clear dates</button>
-                </div>
-              )}
+            {/* Role filter pills */}
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", background: "#EDE8E2", borderRadius: "999px", padding: "3px" }}>
+              {["all", "admin", "user"].map(r => (
+                <button key={r} onClick={() => setRoleFilter(r)} style={{ padding: "3px 10px", fontSize: "12px", fontWeight: roleFilter === r ? 700 : 500, background: roleFilter === r ? WHITE : "transparent", color: roleFilter === r ? INK : MUTED, border: "none", borderRadius: "999px", cursor: "pointer", boxShadow: roleFilter === r ? "0 1px 2px rgba(0,0,0,0.08)" : "none", fontFamily: FONT }}>
+                  {r === "all" ? `All ${totalUsers}` : r.charAt(0).toUpperCase() + r.slice(1)}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Right controls */}
-          <div className="flex items-center" style={{ gap: "12px" }}>
-            <div className="relative">
-              <button onClick={() => setOpenMenu(openMenu === "sort" ? null : "sort")} className="flex items-center" style={{ ...pillBtn, gap: "8px" }}>
-                <AlignLeft size={16} /> Sort
-              </button>
-              {openMenu === "sort" && (
-                <div style={{ ...menuStyle, right: 0 }}>
-                  {SORT_OPTIONS.map((o) => (
-                    <button key={o.key} className={menuItem} style={{ color: sortBy === o.key ? "var(--color-primary)" : "var(--color-body)", fontWeight: sortBy === o.key ? 600 : 400 }}
-                      onClick={() => { setSortBy(o.key); setOpenMenu(null) }}>{o.label}</button>
-                  ))}
-                </div>
-              )}
+          {/* Sort segmented */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "12px", color: MUTED, fontWeight: 500 }}>Sort</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "2px", background: "#EDE8E2", borderRadius: "999px", padding: "3px" }}>
+              {[{ key: "createdAt", label: "Newest" }, { key: "name", label: "Name" }, { key: "role", label: "Role" }].map(s => (
+                <button key={s.key} onClick={() => setSortBy(s.key)} style={{ padding: "3px 10px", fontSize: "12px", fontWeight: sortBy === s.key ? 700 : 500, background: sortBy === s.key ? WHITE : "transparent", color: sortBy === s.key ? INK : MUTED, border: "none", borderRadius: "999px", cursor: "pointer", boxShadow: sortBy === s.key ? "0 1px 2px rgba(0,0,0,0.08)" : "none", fontFamily: FONT }}>
+                  {s.label}
+                </button>
+              ))}
             </div>
-
-            <button onClick={exportCSV} className="flex items-center" style={{ background: "color-mix(in srgb, var(--color-accent) 5%, transparent)", border: "1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)", borderRadius: "48px", padding: "10px 16px", gap: "8px", color: "var(--color-primary)", fontWeight: 600, fontSize: "15px" }}>
-              <Upload size={16} style={{ color: "var(--color-primary)" }} /> Export
-            </button>
           </div>
         </div>
 
-        {/* ---------------- SECTION 4 — TABLE ---------------- */}
-        <div style={{ background: "var(--color-surface)", border: "1px solid color-mix(in srgb, var(--color-border) 10%, transparent)", boxShadow: "0px 8px 32px rgba(139,92,246,0.08)", borderRadius: "32px", padding: "32px" }}>
-          <div className="flex items-center justify-between" style={{ marginBottom: "24px" }}>
-            <h2 style={{ fontWeight: 600, fontSize: "32px", color: "var(--color-ink)", letterSpacing: "1.6px" }}>Entity Roster</h2>
-            <div className="flex items-center" style={{ gap: "8px" }}>
-              <span style={{ width: "8px", height: "8px", background: "var(--color-success)", boxShadow: "0px 0px 8px color-mix(in srgb, var(--color-success) 60%, transparent)", borderRadius: "4px" }} />
-              <span style={{ fontWeight: 600, fontSize: "12px", color: "var(--color-success)", letterSpacing: "1.2px" }}>LIVE SYNC</span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full" style={{ borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ textAlign: "left" }}>
-                  {["USER PROFILE", "EMAIL", "DATE ADDED", "ROLE", "STATUS", "LAST LOGIN"].map((h) => (
-                    <th key={h} style={{ fontWeight: 600, fontSize: "12px", color: "var(--color-muted)", letterSpacing: "1.2px", textTransform: "uppercase", padding: "1px 24px 16px", borderBottom: "1px solid color-mix(in srgb, var(--color-border) 20%, transparent)" }}>{h}</th>
-                  ))}
-                  <th style={{ fontWeight: 600, fontSize: "12px", color: "var(--color-muted)", letterSpacing: "1.2px", textTransform: "uppercase", padding: "1px 24px 16px", borderBottom: "1px solid color-mix(in srgb, var(--color-border) 20%, transparent)", textAlign: "right" }}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedUsers.map((u) => {
-                  const rb = roleBadge(roleOf(u))
-                  const sb = statusBadge(statusOf(u))
-                  return (
-                    <tr key={u.id} className="table-row cursor-pointer transition-colors hover:bg-[var(--color-surface-muted)]" style={{ borderTop: "1px solid color-mix(in srgb, var(--color-border) 10%, transparent)" }} onClick={() => openUser(u)}>
-                      {/* USER PROFILE */}
-                      <td style={{ padding: "24px", minWidth: "232px" }}>
-                        <div className="flex items-center" style={{ gap: "16px" }}>
-                          <div className="flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ width: "48px", height: "48px", borderRadius: "9999px", border: "2px solid color-mix(in srgb, var(--color-accent) 10%, transparent)", background: u.photoURL ? "transparent" : gradientFor(u.name) }}>
-                            {u.photoURL ? <img src={u.photoURL} alt={u.name} className="w-full h-full object-cover" /> : <span style={{ fontWeight: 700, fontSize: "18px", color: "var(--color-inverse)" }}>{initials(u.name)}</span>}
-                          </div>
-                          <div className="flex flex-col">
-                            <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--color-ink)", lineHeight: 1.2 }}>{u.name || "Unknown"}</span>
-                            <span style={{ fontWeight: 400, fontSize: "14px", color: "var(--color-muted)" }}>ID: {networkIdOf(u)}</span>
-                          </div>
+        {/* Table */}
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
+            <thead>
+              <tr style={{ background: "#FAF8F5" }}>
+                {["Customer", "Joined", "Email", "Role", "Status", "Orders", "Spent", "Actions"].map(h => (
+                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: "10.5px", fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap", borderBottom: `1px solid ${BORDER}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedUsers.length === 0 ? (
+                <tr><td colSpan={8} style={{ padding: "40px", textAlign: "center", color: MUTED, fontSize: "13px" }}>No users match your filters</td></tr>
+              ) : paginatedUsers.map(user => {
+                const av = avatarColor(user.name || user.email || "?")
+                const role = roleOf(user)
+                const stat = statusOf(user)
+                const ss = statusStyle(stat)
+                const rb = roleBadge(role)
+                return (
+                  <tr
+                    key={user.id}
+                    className="table-row"
+                    style={{ cursor: "pointer", transition: "background 0.1s", borderBottom: `1px solid #F2EFEA` }}
+                    onMouseEnter={e => e.currentTarget.style.background = STONE}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    onClick={() => { setSelectedUser(user); setDrawerOpen(true); fetchUserStats(user.id) }}
+                  >
+                    {/* Customer avatar + name */}
+                    <td style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: av.bg, color: av.fg, fontWeight: 700, fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          {initials(user.name || user.email)}
                         </div>
-                      </td>
-                      {/* EMAIL */}
-                      <td style={{ padding: "24px", fontWeight: 400, fontSize: "16px", color: "var(--color-body)" }}>{u.email || "—"}</td>
-                      {/* DATE ADDED */}
-                      <td style={{ padding: "24px", fontWeight: 400, fontSize: "16px", color: "var(--color-body)" }}>{fmtDate(u.createdAt)}</td>
-                      {/* ROLE */}
-                      <td style={{ padding: "24px" }}>
-                        <span style={{ background: rb.bg, color: rb.color, borderRadius: "9999px", padding: "2.5px 12px", fontWeight: 700, fontSize: "12px", letterSpacing: "-0.3px", textTransform: "uppercase" }}>{roleOf(u)}</span>
-                      </td>
-                      {/* STATUS */}
-                      <td style={{ padding: "24px" }}>
-                        <span className="inline-flex items-center" style={{ gap: "6px", background: sb.bg, color: sb.color, borderRadius: "9999px", padding: "4px 12px", fontWeight: 700, fontSize: "12px", letterSpacing: "-0.3px", textTransform: "capitalize" }}>
-                          <span style={{ width: "6px", height: "6px", borderRadius: "9999px", background: sb.dot }} /> {statusOf(u)}
-                        </span>
-                      </td>
-                      {/* LAST LOGIN */}
-                      <td style={{ padding: "24px", fontWeight: 400, fontSize: "16px", color: "var(--color-body)" }}>{u.lastLoginAt != null ? relativeTime(u.lastLoginAt) : "Never"}</td>
-                      {/* ACTIONS */}
-                      <td style={{ padding: "24px", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={(e) => {
-                            const r = e.currentTarget.getBoundingClientRect()
-                            setRowMenu(rowMenu?.user.id === u.id ? null : { user: u, top: r.bottom + 6, left: r.right - 184 })
-                          }}
-                          className="hover:bg-[var(--color-surface-muted)] transition-colors"
-                          style={{ borderRadius: "9999px", padding: "8px" }}
-                        >
-                          <MoreVertical size={18} style={{ color: "var(--color-muted)" }} />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-                {paginatedUsers.length === 0 && (
-                  <tr><td colSpan={7} style={{ padding: "48px", textAlign: "center", color: "var(--color-muted)", fontSize: "15px" }}>No entities match your filters.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* PAGINATION */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4" style={{ marginTop: "24px" }}>
-            <span style={{ fontWeight: 400, fontSize: "14px", color: "var(--color-muted)" }}>
-              Showing {showingFrom} to {showingTo} of {filteredUsers.length} entries
-            </span>
-            <div className="flex items-center" style={{ gap: "8px" }}>
-              <button disabled={safePage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} className="flex items-center justify-center" style={{ width: "40px", height: "40px", border: "1px solid color-mix(in srgb, var(--color-border) 30%, transparent)", borderRadius: "32px", opacity: safePage === 1 ? 0.5 : 1, cursor: safePage === 1 ? "not-allowed" : "pointer" }}>
-                <ChevronLeft size={16} style={{ color: "var(--color-body)" }} />
-              </button>
-              {buildPages(safePage, totalPages).map((p, i) =>
-                p === "…" ? (
-                  <span key={`e${i}`} style={{ color: "var(--color-muted)", padding: "0 4px" }}>…</span>
-                ) : (
-                  <button key={p} onClick={() => setCurrentPage(p)} className="flex items-center justify-center" style={{ minWidth: "40px", height: "40px", borderRadius: "32px", fontWeight: 600, fontSize: "14px", ...(p === safePage ? { background: "var(--color-primary)", color: "var(--color-inverse)" } : { color: "var(--color-body)" }) }}>{p}</button>
+                        <div>
+                          <div style={{ fontWeight: 700, color: INK, fontSize: "13px" }}>{user.name || "—"}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px", color: "#44403C", fontWeight: 500, whiteSpace: "nowrap" }}>{fmtDate(user.created_at || user.createdAt)}</td>
+                    <td style={{ padding: "12px 16px", color: MUTED, maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email || "—"}</td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ background: rb.bg, color: rb.color, padding: "3px 8px", borderRadius: "9999px", fontSize: "11px", fontWeight: 700 }}>
+                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ background: ss.bg, color: ss.color, padding: "3px 8px", borderRadius: "9999px", fontSize: "11px", fontWeight: 700 }}>
+                        {stat.charAt(0).toUpperCase() + stat.slice(1)}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px", fontWeight: 700, color: INK }}>{user.orderCount ?? "—"}</td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: INK, fontSize: "13px" }}>
+                          {user.totalSpent != null ? `₹${Number(user.totalSpent).toLocaleString("en-IN")}` : "—"}
+                        </div>
+                        {user.totalSpent != null && totalUsers > 0 && (
+                          <div style={{ marginTop: "4px", width: "80px", height: "3px", background: "#E2DCD4", borderRadius: "999px", overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${Math.min(100, (user.totalSpent / 25000) * 100)}%`, background: TEAL, borderRadius: "999px" }} />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <button
+                        onClick={e => { e.stopPropagation(); setSelectedUser(user); setDrawerOpen(true); fetchUserStats(user.id) }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "5px 10px", borderRadius: "8px", background: TEAL_L, color: TEAL, border: "none", fontSize: "11.5px", fontWeight: 600, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = "0.8"}
+                        onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
                 )
-              )}
-              <button disabled={safePage === totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} className="flex items-center justify-center" style={{ width: "40px", height: "40px", border: "1px solid color-mix(in srgb, var(--color-border) 30%, transparent)", borderRadius: "32px", opacity: safePage === totalPages ? 0.5 : 1, cursor: safePage === totalPages ? "not-allowed" : "pointer" }}>
-                <ChevronRight size={16} style={{ color: "var(--color-body)" }} />
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination footer */}
+        <div style={{ padding: "12px 20px", borderTop: `1px solid #EFECE6`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "12.5px", color: MUTED }}>
+            Showing <strong style={{ color: INK }}>{showingFrom}–{showingTo}</strong> of <strong style={{ color: INK }}>{filteredUsers.length}</strong>
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} style={{ padding: "4px 10px", borderRadius: "8px", border: `1px solid ${BORDER}`, background: WHITE, color: safePage === 1 ? MUTED : INK, fontSize: "12px", fontWeight: 600, cursor: safePage === 1 ? "default" : "pointer", fontFamily: FONT }}>←</button>
+            {buildPages(safePage, totalPages).map((p, i) => (
+              <button key={i} onClick={() => typeof p === "number" && setCurrentPage(p)} style={{ padding: "4px 10px", borderRadius: "8px", border: `1px solid ${typeof p === "number" && p === safePage ? TEAL : BORDER}`, background: typeof p === "number" && p === safePage ? TEAL : WHITE, color: typeof p === "number" && p === safePage ? WHITE : INK, fontSize: "12px", fontWeight: 600, cursor: typeof p === "number" ? "pointer" : "default", fontFamily: FONT }}>
+                {p}
               </button>
-            </div>
+            ))}
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} style={{ padding: "4px 10px", borderRadius: "8px", border: `1px solid ${BORDER}`, background: WHITE, color: safePage === totalPages ? MUTED : INK, fontSize: "12px", fontWeight: 600, cursor: safePage === totalPages ? "default" : "pointer", fontFamily: FONT }}>→</button>
           </div>
         </div>
       </div>
 
-      {/* Click-away backdrop for any open dropdown */}
-      {(openMenu || rowMenu) && <div className="fixed inset-0" style={{ zIndex: 35 }} onClick={() => { setOpenMenu(null); setRowMenu(null) }} />}
+      {/* ── User Detail Drawer (preserved from original) ──────── */}
+      {drawerOpen && selectedUser && (
+        <>
+          <div onClick={() => setDrawerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 40, backdropFilter: "blur(2px)" }} />
+          <div ref={drawerRef} style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: "380px", maxWidth: "95vw", background: WHITE, zIndex: 50, boxShadow: "-8px 0 32px rgba(0,0,0,0.12)", overflowY: "auto", fontFamily: FONT }}>
+            <div style={{ padding: "20px 24px" }}>
+              {/* Drawer header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+                <h2 style={{ fontWeight: 800, fontSize: "18px", color: INK }}>User Details</h2>
+                <button onClick={() => setDrawerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: "4px" }}>
+                  <X size={20} />
+                </button>
+              </div>
 
-      {/* Row actions popover (fixed so the table's overflow can't clip it) */}
-      {rowMenu && (
-        <div style={{ position: "fixed", top: rowMenu.top, left: rowMenu.left, zIndex: 46, minWidth: "184px", background: "var(--color-surface)", borderRadius: "16px", border: "1px solid color-mix(in srgb, var(--color-border) 40%, transparent)", boxShadow: "0px 12px 32px rgba(29,26,35,0.12)", padding: "8px", fontFamily: INTER }}>
-          <button className={menuItem} style={{ color: "var(--color-body)" }} onClick={() => { const u = rowMenu.user; setRowMenu(null); openUser(u) }}>View Details</button>
-          <button className={menuItem} style={{ color: "var(--color-body)" }} onClick={() => { const u = rowMenu.user; setRowMenu(null); resetKeys(u) }}>Reset Security Keys</button>
-          <button className={menuItem} style={{ color: "var(--color-accent-strong)" }} onClick={() => { const u = rowMenu.user; setRowMenu(null); suspendUser(u) }}>Suspend Account</button>
-          <button className={menuItem} style={{ color: "var(--color-error)" }} onClick={() => { const u = rowMenu.user; setRowMenu(null); deleteUser(u) }}>Delete User</button>
-        </div>
-      )}
-
-      {/* ---------------- ENTITY DETAILS DRAWER ---------------- */}
-      <div
-        ref={drawerRef}
-        style={{ position: "fixed", top: "88px", right: "-400px", height: "calc(100vh - 88px)", width: "400px", maxWidth: "100vw", background: "var(--color-surface)", zIndex: 45, boxShadow: "-12px 0 40px rgba(29,26,35,0.12)", display: "flex", flexDirection: "column" }}
-      >
-        {selectedUser && (
-          <>
-            {/* Header */}
-            <div className="flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid color-mix(in srgb, var(--color-border) 20%, transparent)", padding: "32px" }}>
-              <h3 style={{ fontWeight: 600, fontSize: "20px", color: "var(--color-ink)", letterSpacing: "0.4px" }}>Entity Details</h3>
-              <button onClick={closeDrawer} className="hover:bg-[var(--color-surface-muted)] transition-colors" style={{ borderRadius: "9999px", padding: "8px" }}>
-                <X size={14} style={{ color: "var(--color-muted)" }} />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex flex-col overflow-y-auto" style={{ padding: "32px", gap: "40px" }}>
-              {/* Profile header */}
-              <div className="flex flex-col items-center" style={{ gap: "16px" }}>
-                <div className="flex items-center justify-center overflow-hidden" style={{ width: "96px", height: "96px", borderRadius: "9999px", border: "4px solid color-mix(in srgb, var(--color-accent) 10%, transparent)", background: selectedUser.photoURL ? "transparent" : gradientFor(selectedUser.name) }}>
-                  {selectedUser.photoURL ? <img src={selectedUser.photoURL} alt={selectedUser.name} className="w-full h-full object-cover" /> : <span style={{ fontWeight: 700, fontSize: "32px", color: "var(--color-inverse)" }}>{initials(selectedUser.name)}</span>}
+              {/* Avatar + name */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "24px" }}>
+                <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: gradientFor(selectedUser.name), display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                  {selectedUser.photoURL
+                    ? <img src={selectedUser.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <span style={{ color: "white", fontWeight: 800, fontSize: "22px" }}>{initials(selectedUser.name || selectedUser.email)}</span>
+                  }
                 </div>
-                <div className="flex flex-col items-center" style={{ gap: "2px" }}>
-                  <span style={{ fontWeight: 600, fontSize: "20px", color: "var(--color-ink)", letterSpacing: "0.4px", textAlign: "center" }}>{selectedUser.name || "Unknown"}</span>
-                  <span style={{ fontWeight: 600, fontSize: "12px", color: "var(--color-primary)", letterSpacing: "1.2px", textTransform: "uppercase" }}>{roleOf(selectedUser)}</span>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontWeight: 700, fontSize: "18px", color: INK }}>{selectedUser.name || "Unknown"}</div>
+                  <div style={{ fontSize: "12px", color: TEAL, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>{roleOf(selectedUser)}</div>
                 </div>
-                <div className="flex items-center justify-center" style={{ gap: "8px" }}>
-                  <a href={`mailto:${selectedUser.email || ""}`} className="flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--color-accent) 10%, transparent)", borderRadius: "48px", padding: "10px" }}><Mail size={20} style={{ color: "var(--color-primary)" }} /></a>
-                  <button onClick={() => toast.info("Messaging is not configured yet.")} className="flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--color-accent) 10%, transparent)", borderRadius: "48px", padding: "10px" }}><MessageSquare size={20} style={{ color: "var(--color-primary)" }} /></button>
-                  <button onClick={() => toast.info("No phone number on file.")} className="flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--color-accent) 10%, transparent)", borderRadius: "48px", padding: "10px" }}><Phone size={20} style={{ color: "var(--color-primary)" }} /></button>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <a href={`mailto:${selectedUser.email}`} style={{ width: "36px", height: "36px", borderRadius: "50%", background: TEAL_L, color: TEAL, display: "flex", alignItems: "center", justifyContent: "center" }}><Mail size={16}/></a>
+                  <button onClick={() => toast.info("Messaging not configured.")} style={{ width: "36px", height: "36px", borderRadius: "50%", background: TEAL_L, color: TEAL, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><MessageSquare size={16}/></button>
                 </div>
               </div>
 
-              {/* Detailed stats */}
-              <div className="flex" style={{ gap: "16px" }}>
-                <div className="flex-1 flex flex-col" style={{ background: "var(--color-surface-muted)", borderRadius: "16px", padding: "16px", gap: "4px" }}>
-                  <span style={{ fontWeight: 600, fontSize: "12px", color: "var(--color-muted)", letterSpacing: "1.2px" }}>Total Spent</span>
-                  <span style={{ fontWeight: 700, fontSize: "16px", color: "var(--color-ink)" }}>{selectedUser.totalSpent === undefined ? "…" : `₹${Number(selectedUser.totalSpent).toLocaleString("en-IN")}`}</span>
-                </div>
-                <div className="flex-1 flex flex-col" style={{ background: "var(--color-surface-muted)", borderRadius: "16px", padding: "16px", gap: "4px" }}>
-                  <span style={{ fontWeight: 600, fontSize: "12px", color: "var(--color-muted)", letterSpacing: "1.2px" }}>Orders</span>
-                  <span style={{ fontWeight: 700, fontSize: "16px", color: "var(--color-ink)" }}>{selectedUser.orderCount === undefined ? "…" : selectedUser.orderCount}</span>
-                </div>
+              {/* Stats */}
+              <div style={{ display: "flex", gap: "10px", marginBottom: "24px" }}>
+                {[{ label: "Total Spent", value: selectedUser.totalSpent !== undefined ? `₹${Number(selectedUser.totalSpent).toLocaleString("en-IN")}` : "…" },
+                  { label: "Orders", value: selectedUser.orderCount !== undefined ? selectedUser.orderCount : "…" }
+                ].map(s => (
+                  <div key={s.label} style={{ flex: 1, background: "#F7F5F2", borderRadius: "12px", padding: "12px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.8px" }}>{s.label}</div>
+                    <div style={{ fontWeight: 700, fontSize: "16px", color: INK, marginTop: "4px" }}>{s.value}</div>
+                  </div>
+                ))}
               </div>
 
               {/* Registry data */}
-              <div className="flex flex-col" style={{ gap: "24px" }}>
-                <div className="flex items-center" style={{ gap: "8px" }}>
-                  <Info size={16} style={{ color: "var(--color-body)" }} />
-                  <span style={{ fontWeight: 700, fontSize: "16px", color: "var(--color-body)" }}>Registry Data</span>
-                </div>
-                {(() => {
-                  const s = statusOf(selectedUser)
-                  const statusText = s === "active" ? "Verified" : s[0].toUpperCase() + s.slice(1)
-                  const statusColor = s === "active" ? "var(--color-success)" : s === "pending" ? "var(--color-accent-strong)" : s === "suspended" ? "var(--color-error)" : "var(--color-body)"
-                  const rows = [
-                    { label: "Network ID", value: networkIdOf(selectedUser), color: "var(--color-ink)", font: INTER, weight: 600 },
-                    { label: "Status", value: statusText, color: statusColor, font: INTER, weight: 600 },
-                    { label: "Last IP", value: selectedUser.lastIP || "—", color: "var(--color-ink)", font: MONO, weight: 400 },
-                    { label: "Joined", value: fmtDate(selectedUser.createdAt), color: "var(--color-ink)", font: INTER, weight: 600 },
-                  ]
-                  return rows.map((r) => (
-                    <div key={r.label} className="flex items-center justify-between" style={{ borderBottom: "1px solid color-mix(in srgb, var(--color-border) 10%, transparent)", paddingBottom: "8px" }}>
-                      <span style={{ fontWeight: 400, fontSize: "14px", color: "var(--color-muted)" }}>{r.label}</span>
-                      <span style={{ fontWeight: r.weight, fontSize: "14px", color: r.color, fontFamily: r.font }}>{r.value}</span>
-                    </div>
-                  ))
-                })()}
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ fontWeight: 700, fontSize: "13px", color: MUTED, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "12px" }}>Registry Data</div>
+                {[
+                  { label: "Network ID", value: networkIdOf(selectedUser) },
+                  { label: "Status", value: statusOf(selectedUser) },
+                  { label: "Email", value: selectedUser.email || "—" },
+                  { label: "Joined", value: fmtDate(selectedUser.created_at || selectedUser.createdAt) },
+                ].map(row => (
+                  <div key={row.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F2EFEA" }}>
+                    <span style={{ fontSize: "13px", color: MUTED }}>{row.label}</span>
+                    <span style={{ fontSize: "13px", color: INK, fontWeight: 600 }}>{row.value}</span>
+                  </div>
+                ))}
               </div>
 
-              {/* Administrative controls */}
-              <div className="flex flex-col" style={{ gap: "16px" }}>
-                <span style={{ fontWeight: 700, fontSize: "16px", color: "var(--color-body)" }}>Administrative Controls</span>
-                <button onClick={() => resetKeys(selectedUser)} className="flex items-center justify-center w-full" style={{ background: "var(--color-surface-muted)", borderRadius: "48px", height: "48px", gap: "8px" }}>
-                  <KeyRound size={19} style={{ color: "var(--color-ink)" }} />
-                  <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--color-ink)" }}>Reset Security Keys</span>
+              {/* Admin controls */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <button onClick={() => resetKeys(selectedUser)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", height: "44px", background: "#F7F5F2", border: "none", borderRadius: "12px", fontWeight: 600, fontSize: "14px", color: INK, cursor: "pointer", fontFamily: FONT }}>
+                  <KeyRound size={17}/> Reset Security Keys
                 </button>
-                <button onClick={() => suspendUser(selectedUser)} className="flex items-center justify-center w-full" style={{ background: "var(--color-error-subtle)", borderRadius: "48px", height: "48px", gap: "8px" }}>
-                  <Ban size={17} style={{ color: "var(--color-error)" }} />
-                  <span style={{ fontWeight: 600, fontSize: "16px", color: "var(--color-error)" }}>Suspend Account</span>
+                <button onClick={() => suspendUser(selectedUser)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", height: "44px", background: "#FEE2E2", border: "none", borderRadius: "12px", fontWeight: 600, fontSize: "14px", color: "#991B1B", cursor: "pointer", fontFamily: FONT }}>
+                  <Ban size={16}/> Suspend Account
                 </button>
               </div>
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
-
 
 export default UsersPage

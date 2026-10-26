@@ -688,49 +688,41 @@ const AdminOrdersPage = () => {
 
   /* ============================== RENDER ============================== */
   return (
-    <div ref={containerRef} className="relative min-h-screen" style={{ background: "var(--color-background)", fontFamily: INTER, marginTop: isMobile ? "96px" : 0 }}>
-      {/* Background blobs */}
-      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute" style={{ top: "-100px", left: "-100px", width: "576px", height: "576px", borderRadius: "9999px", background: "color-mix(in srgb, var(--color-accent) 15%, transparent)", filter: "blur(70px)" }} />
-        <div className="absolute" style={{ bottom: "-150px", right: "-150px", width: "704px", height: "704px", borderRadius: "9999px", background: "color-mix(in srgb, var(--color-info) 10%, transparent)", filter: "blur(80px)" }} />
-        <div className="absolute" style={{ bottom: "-100px", left: "40%", width: "512px", height: "512px", borderRadius: "9999px", background: "color-mix(in srgb, var(--color-accent-strong) 10%, transparent)", filter: "blur(60px)" }} />
-      </div>
+    <div
+      ref={containerRef}
+      className="relative"
+      style={{
+        flex: 1,
+        minHeight: "100vh",
+        fontFamily: "'Plus Jakarta Sans','Inter',sans-serif",
+        background: "transparent",
+        overflowX: "hidden",
+      }}
+    >
 
       {/* Main content */}
-      <div style={{ padding: isMobile ? "16px 0 48px" : "24px 0 48px", display: "flex", flexDirection: "column" }}>
-        {/* Analytics cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: isMobile ? "12px" : "24px", padding: `0 ${sidePad}`, marginBottom: isMobile ? "24px" : "40px" }}>
-          <div className="analytics-card flex flex-col" style={{ ...cardBase, gap: "12px" }}>
-            <div className="flex items-center justify-between">
-              <span style={labelStyle}>TOTAL ORDERS</span>
-              <span style={{ background: "color-mix(in srgb, var(--color-info) 10%, transparent)", color: "var(--color-info)", fontFamily: MONO, fontSize: "12px", letterSpacing: "0.6px", borderRadius: "9999px", padding: "4px 10px" }}>+12.4%</span>
-            </div>
-            <span style={{ ...valueStyle, color: "var(--color-primary)" }}>{loading ? statSkel : total}</span>
-          </div>
+      <div style={{ padding: isMobile ? "16px 0 48px" : "20px 0 48px", display: "flex", flexDirection: "column" }}>
 
-          <div className="analytics-card flex flex-col" style={{ ...cardBase, gap: "12px" }}>
-            <div className="flex items-center justify-between">
-              <span style={labelStyle}>AWAITING CONFIRMATION</span>
-              <span style={{ background: "color-mix(in srgb, var(--color-accent-strong) 10%, transparent)", color: "var(--color-accent-strong)", fontFamily: MONO, fontSize: "12px", letterSpacing: "0.6px", borderRadius: "9999px", padding: "4px 10px" }}>Action Required</span>
+        {/* KPI cards — Pelago style: white, rounded-2xl, teal accent */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: "12px", padding: `0 ${sidePad}`, marginBottom: isMobile ? "20px" : "28px" }}>
+          {[
+            { label: "Total Orders",          value: loading ? "…" : total,          badge: "+12.4%",        badgeBg: "#E5F6EE", badgeColor: "#0F6848" },
+            { label: "Awaiting Confirmation",  value: loading ? "…" : placedCount,    badge: "Action Required", badgeBg: "#FDF0E2", badgeColor: "#A75C1C" },
+            { label: "In Transit",             value: loading ? "…" : shippedCount,   badge: null,           badgeBg: null,      badgeColor: null },
+            { label: "Delivered",              value: loading ? "…" : deliveredCount, badge: null,           badgeBg: null,      badgeColor: null },
+          ].map(card => (
+            <div key={card.label} className="analytics-card" style={{ background: "#fff", border: "1px solid #E4DDD3", borderRadius: "16px", padding: "14px", boxShadow: "0 1px 2px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "90px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 600, color: "#78716C", marginBottom: "8px" }}>{card.label}</div>
+              <div>
+                <div style={{ fontSize: "22px", fontWeight: 800, color: "#1C1917", lineHeight: 1 }}>{card.value}</div>
+                {card.badge && (
+                  <div style={{ marginTop: "6px" }}>
+                    <span style={{ display: "inline-block", background: card.badgeBg, color: card.badgeColor, fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "999px" }}>{card.badge}</span>
+                  </div>
+                )}
+              </div>
             </div>
-            <span style={{ ...valueStyle, color: "var(--color-ink)" }}>{loading ? statSkel : placedCount}</span>
-          </div>
-
-          <div className="analytics-card flex flex-col" style={{ ...cardBase, gap: "12px" }}>
-            <div className="flex items-center justify-between">
-              <span style={labelStyle}>IN TRANSIT</span>
-              <Truck size={20} style={{ color: "var(--color-info)", opacity: 0.5 }} />
-            </div>
-            <span style={{ ...valueStyle, color: "var(--color-info)" }}>{loading ? statSkel : shippedCount}</span>
-          </div>
-
-          <div className="analytics-card flex flex-col" style={{ ...cardBase, gap: "12px" }}>
-            <span style={labelStyle}>DELIVERED</span>
-            <span style={{ ...valueStyle, color: "var(--color-accent-strong)" }}>{loading ? statSkel : deliveredCount}</span>
-            <div style={{ background: "color-mix(in srgb, var(--color-accent-strong) 10%, transparent)", height: "8px", borderRadius: "9999px", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${total ? (deliveredCount / total) * 100 : 0}%`, background: "var(--color-accent-strong)", borderRadius: "9999px" }} />
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Tab bar + search — tabs on the left, search on the right (stacks below

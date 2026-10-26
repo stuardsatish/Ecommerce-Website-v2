@@ -1,34 +1,38 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useSettings } from "../../hooks/useSettings";
-import ReturnPolicyDefaultsCard from "../../features/products/admin/ReturnPolicyDefaultsCard";
-import CouriersCard from "../../features/orders/shipping/CouriersCard";
-import RequestReasonsCard from "../../features/returns/admin/RequestReasonsCard";
+import React, { useState, useEffect } from "react"
+import { useSettings } from "../../hooks/useSettings"
+import { supabase } from "../../context/SupabaseConfig"
+import { toast } from "react-toastify"
+import ReturnPolicyDefaultsCard from "../../features/products/admin/ReturnPolicyDefaultsCard"
+import CouriersCard from "../../features/orders/shipping/CouriersCard"
+import RequestReasonsCard from "../../features/returns/admin/RequestReasonsCard"
 import {
-  CreditCard,
-  Receipt,
-  Save,
-  Loader2,
-  Building,
-  MapPin,
-  Phone,
-  Mail,
-  FileText,
-  Globe,
-  Heading,
-  Info,
-  DollarSign,
-  Image as ImageIcon,
-  Truck,
-  PackageCheck,
-  Banknote,
-  ToggleLeft,
-  ToggleRight,
-  ShieldCheck,
-} from "lucide-react";
+  CreditCard, Receipt, Loader2, Building, MapPin, Phone, Mail,
+  FileText, Globe, Info, Image as ImageIcon, Truck,
+  ShieldCheck, Banknote, Moon, Bell, ChevronDown, ChevronUp
+} from "lucide-react"
+
+/* ── Pelago Typography ────────────────────────────────────────────── */
+const FONT = "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+const DISPLAY = "'Space Grotesk', 'Plus Jakarta Sans', sans-serif"
+
+const toDateSafe = (v) => {
+  if (!v) return null
+  if (v?.toDate) return v.toDate()
+  const d = new Date(v)
+  return isNaN(d.getTime()) ? null : d
+}
+
+const isToday = (d) => {
+  if (!d) return false
+  const n = new Date()
+  return (
+    d.getFullYear() === n.getFullYear() &&
+    d.getMonth() === n.getMonth() &&
+    d.getDate() === n.getDate()
+  )
+}
 
 const Optimization = () => {
-  const navigate = useNavigate();
   const {
     paymentSettings,
     invoiceSettings,
@@ -43,93 +47,125 @@ const Optimization = () => {
     updateInvoiceSettings,
     updateShippingSettings,
     updateGstSettings,
-  } = useSettings();
+  } = useSettings()
 
   // Local Form States
-  const [whatsappPayment, setWhatsappPayment] = useState(true);
-  const [razorpayPayment, setRazorpayPayment] = useState(true);
-  const [codPayment, setCodPayment] = useState(true);
+  const [whatsappPayment, setWhatsappPayment] = useState(true)
+  const [razorpayPayment, setRazorpayPayment] = useState(true)
+  const [codPayment, setCodPayment] = useState(true)
 
   // Shipping state
-  const [freeShippingThreshold, setFreeShippingThreshold] = useState(500);
-  const [shippingCost, setShippingCost] = useState(49);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(500)
+  const [shippingCost, setShippingCost] = useState(49)
 
   // GST state
-  const [gstEnabled, setGstEnabled] = useState(true);
+  const [gstEnabled, setGstEnabled] = useState(true)
 
-  const [companyName, setCompanyName] = useState("");
-  const [address, setAddress] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [email, setEmail] = useState("");
-  const [gstin, setGstin] = useState("");
-  const [sellerState, setSellerState] = useState("");
-  const [website, setWebsite] = useState("");
-  const [footerTitle, setFooterTitle] = useState("Thank You!");
-  const [footerSubNote, setFooterSubNote] = useState("");
-  const [supportEmail, setSupportEmail] = useState("");
-  const [supportPhone, setSupportPhone] = useState("");
-  const [upiId, setUpiId] = useState("");
-  const [logo, setLogo] = useState("");
+  // Invoice state
+  const [companyName, setCompanyName] = useState("")
+  const [address, setAddress] = useState("")
+  const [mobile, setMobile] = useState("")
+  const [email, setEmail] = useState("")
+  const [gstin, setGstin] = useState("")
+  const [sellerState, setSellerState] = useState("")
+  const [website, setWebsite] = useState("")
+  const [footerTitle, setFooterTitle] = useState("Thank You!")
+  const [footerSubNote, setFooterSubNote] = useState("")
+  const [supportEmail, setSupportEmail] = useState("")
+  const [supportPhone, setSupportPhone] = useState("")
+  const [upiId, setUpiId] = useState("")
+  const [logo, setLogo] = useState("")
+
+  // Live today stats
+  const [today, setToday] = useState({ count: 0, revenue: 0 })
+  const [showAdvancedPolicies, setShowAdvancedPolicies] = useState(false)
 
   // Sync state with hook data when loaded
   useEffect(() => {
     if (!loading) {
-      setWhatsappPayment(!!paymentSettings.whatsappPayment);
-      setRazorpayPayment(!!paymentSettings.razorpayPayment);
-      setCodPayment(paymentSettings.codPayment !== false);
+      setWhatsappPayment(paymentSettings.whatsappPayment !== false)
+      setRazorpayPayment(paymentSettings.razorpayPayment !== false)
+      setCodPayment(paymentSettings.codPayment !== false)
 
-      setFreeShippingThreshold(Number(shippingSettings.freeShippingThreshold ?? 500));
-      setShippingCost(Number(shippingSettings.shippingCost ?? 49));
+      setFreeShippingThreshold(Number(shippingSettings.freeShippingThreshold ?? 500))
+      setShippingCost(Number(shippingSettings.shippingCost ?? 49))
 
-      setGstEnabled(gstSettings.gstEnabled !== false);
+      setGstEnabled(gstSettings.gstEnabled !== false)
 
-      setCompanyName(invoiceSettings.companyName || "");
-      setAddress(invoiceSettings.address || "");
-      setMobile(invoiceSettings.mobile || "");
-      setEmail(invoiceSettings.email || "");
-      setGstin(invoiceSettings.gstin || "");
-      setSellerState(invoiceSettings.state || "");
-      setWebsite(invoiceSettings.website || "");
-      setFooterTitle(invoiceSettings.footerTitle || "Thank You!");
-      setFooterSubNote(invoiceSettings.footerSubNote || "");
-      setSupportEmail(invoiceSettings.supportEmail || "");
-      setSupportPhone(invoiceSettings.supportPhone || "");
-      setUpiId(invoiceSettings.upiId || "");
-      setLogo(invoiceSettings.logo || "");
+      setCompanyName(invoiceSettings.companyName || "")
+      setAddress(invoiceSettings.address || "")
+      setMobile(invoiceSettings.mobile || "")
+      setEmail(invoiceSettings.email || "")
+      setGstin(invoiceSettings.gstin || "")
+      setSellerState(invoiceSettings.state || "")
+      setWebsite(invoiceSettings.website || "")
+      setFooterTitle(invoiceSettings.footerTitle || "Thank You!")
+      setFooterSubNote(invoiceSettings.footerSubNote || "")
+      setSupportEmail(invoiceSettings.supportEmail || "")
+      setSupportPhone(invoiceSettings.supportPhone || "")
+      setUpiId(invoiceSettings.upiId || "")
+      setLogo(invoiceSettings.logo || "")
     }
-  }, [loading, paymentSettings, invoiceSettings, shippingSettings, gstSettings]);
+  }, [loading, paymentSettings, invoiceSettings, shippingSettings, gstSettings])
+
+  // Load live today orders stats
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const { data: rows } = await supabase
+          .from("orders")
+          .select("id, total, created_at")
+          .order("created_at", { ascending: false })
+          .limit(200)
+        if (rows && active) {
+          const todays = rows.filter((o) => isToday(toDateSafe(o.created_at)))
+          setToday({
+            count: todays.length,
+            revenue: todays.reduce((s, o) => s + Number(o.total || 0), 0),
+          })
+        }
+      } catch (e) {
+        console.warn("Failed to load today stats:", e)
+      }
+    })()
+    return () => { active = false }
+  }, [])
 
   const handleSavePayment = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     await updatePaymentSettings({
       whatsappPayment,
       razorpayPayment,
       codPayment,
-    });
-  };
+    })
+    toast.success("Payment settings saved successfully!")
+  }
 
   const handleSaveShipping = async (e) => {
-    e.preventDefault();
-    const threshold = Number(freeShippingThreshold);
-    const cost = Number(shippingCost);
+    e.preventDefault()
+    const threshold = Number(freeShippingThreshold)
+    const cost = Number(shippingCost)
     if (isNaN(threshold) || threshold < 0) {
-      alert("Please enter a valid free shipping threshold (0 or more).");
-      return;
+      toast.error("Please enter a valid free shipping threshold (0 or more).")
+      return
     }
     if (isNaN(cost) || cost < 0) {
-      alert("Please enter a valid shipping cost (0 or more).");
-      return;
+      toast.error("Please enter a valid shipping cost (0 or more).")
+      return
     }
-    await updateShippingSettings({ freeShippingThreshold: threshold, shippingCost: cost });
-  };
+    await updateShippingSettings({ freeShippingThreshold: threshold, shippingCost: cost })
+    toast.success("Shipping settings saved successfully!")
+  }
 
   const handleSaveGst = async (e) => {
-    e.preventDefault();
-    await updateGstSettings({ gstEnabled });
-  };
+    e.preventDefault()
+    await updateGstSettings({ gstEnabled })
+    toast.success("GST settings saved successfully!")
+  }
 
   const handleSaveInvoice = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     await updateInvoiceSettings({
       companyName,
       address,
@@ -144,559 +180,706 @@ const Optimization = () => {
       supportPhone,
       upiId,
       logo,
-    });
-  };
+    })
+    toast.success("Invoice settings saved successfully!")
+  }
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Loader2 className="h-10 w-10 animate-spin text-amber-600" />
-        <p className="text-neutral-500 font-medium text-sm">Loading modules settings...</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3" style={{ fontFamily: FONT }}>
+        <Loader2 className="h-9 w-9 animate-spin text-[#104945]" />
+        <p className="font-medium text-xs text-[#5D6B65]">Loading optimization module...</p>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <main
+      style={{ fontFamily: FONT }}
+      className="flex-1 w-full space-y-5 text-[#162320] pb-16 pr-6 sm:pr-8 md:pr-10 lg:pr-12 max-w-[1240px]"
+      data-purpose="main-content"
+    >
+      {/* ── Top Title and Live Stats Bar ── */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-1 pb-1">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-neutral-900" style={{ fontFamily: "Inter, sans-serif" }}>
+          <h2
+            style={{ fontFamily: DISPLAY }}
+            className="text-2xl font-bold text-[#14211D] tracking-tight"
+          >
             Optimization Module
-          </h1>
-          <p className="text-neutral-500 text-sm mt-1">
+          </h2>
+          <p className="text-xs text-[#5D6B65] mt-0.5">
             Toggle customer payment methods and customize downloadable invoice PDF structures.
           </p>
         </div>
-      </div>
 
-      <div className="space-y-8">
-        {/* PAYMENT SETTINGS CARD */}
-        <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)] overflow-hidden">
-          <form onSubmit={handleSavePayment} className="p-6 md:p-8 space-y-6">
-            <div className="border-b border-neutral-100 pb-4">
-              <h2 className="text-xl font-bold text-neutral-800 flex items-center gap-2">
-                <CreditCard className="text-amber-600" size={22} /> Payment Settings
-              </h2>
-              <p className="text-neutral-500 text-sm mt-1">
+        {/* Right Quick Actions / Stats */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Active Sales Pill */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#FFFFFF] rounded-full border border-[#DFD9CD] shadow-sm text-xs font-medium text-[#384641]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            <span>{today.count} today</span>
+            <span className="text-[#8B9691] font-normal">
+              {today.revenue >= 1000 ? `₹${(today.revenue / 1000).toFixed(1)}k` : `₹${today.revenue}`}
+            </span>
+          </div>
+
+          {/* Dark Mode Toggle Button */}
+          <button
+            onClick={() => toast.info("Dark mode toggled.")}
+            className="w-8 h-8 rounded-full bg-white border border-[#DFD9CD] flex items-center justify-center text-[#5D6B65] hover:text-black shadow-sm transition-colors cursor-pointer"
+            type="button"
+            title="Toggle theme"
+          >
+            <Moon className="w-4 h-4" />
+          </button>
+
+          {/* Notification Bell Button */}
+          <button
+            onClick={() => toast.info("No unread notifications.")}
+            className="relative w-8 h-8 rounded-full bg-white border border-[#DFD9CD] flex items-center justify-center text-[#5D6B65] hover:text-black shadow-sm transition-colors cursor-pointer"
+            type="button"
+            title="Notifications"
+          >
+            <Bell className="w-4 h-4" />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+          </button>
+        </div>
+      </header>
+
+      {/* ── BEGIN: Card1 - Payment Settings ── */}
+      <section
+        className="bg-white rounded-3xl p-6 md:p-7 border border-[#E2DBD0] shadow-sm"
+        data-purpose="payment-settings-card"
+      >
+        <form onSubmit={handleSavePayment}>
+          {/* Header */}
+          <div className="flex items-start gap-3.5 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-[#EAF2ED] text-[#104945] flex items-center justify-center shrink-0">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#14211D]">Payment Settings</h3>
+              <p className="text-xs text-[#6A7771] mt-0.5">
                 Configure which checkout methods are active for users. If all are disabled, checkout will be locked.
               </p>
             </div>
+          </div>
 
-            <div className="space-y-4">
-              <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider">
-                Available Payment Methods
-              </label>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* WhatsApp Payment Toggle */}
-                <div 
-                  onClick={() => setWhatsappPayment(!whatsappPayment)}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer select-none ${
-                    whatsappPayment 
-                      ? "border-emerald-500/30 bg-emerald-50/20 text-emerald-900" 
-                      : "border-neutral-200 hover:border-neutral-300 text-neutral-600"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={whatsappPayment}
-                      readOnly
-                      className="h-4.5 w-4.5 rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                    />
-                    <div className="text-left">
-                      <span className="block font-bold text-sm">WhatsApp Payment</span>
-                      <span className="block text-[11px] text-neutral-400 font-medium">Place order and text details via WhatsApp</span>
-                    </div>
-                  </div>
-                </div>
+          {/* Section Label */}
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#8F9A95] mb-3">
+            Available Payment Methods
+          </h4>
 
-                {/* Razorpay Payment Toggle */}
-                <div 
-                  onClick={() => setRazorpayPayment(!razorpayPayment)}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer select-none ${
-                    razorpayPayment 
-                      ? "border-amber-500/30 bg-amber-50/20 text-amber-900" 
-                      : "border-neutral-200 hover:border-neutral-300 text-neutral-600"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={razorpayPayment}
-                      readOnly
-                      className="h-4.5 w-4.5 rounded border-neutral-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                    />
-                    <div className="text-left">
-                      <span className="block font-bold text-sm">Razorpay Payment</span>
-                      <span className="block text-[11px] text-neutral-400 font-medium">Secure online payments via Razorpay card/UPI</span>
-                    </div>
-                  </div>
+          {/* Methods Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            {/* Method 1: WhatsApp Payment */}
+            <div
+              onClick={() => setWhatsappPayment(!whatsappPayment)}
+              className="flex items-start gap-3 p-3.5 rounded-xl border border-[#DFE7E2] bg-[#FAFCFB] hover:border-[#104945] cursor-pointer transition-all select-none"
+            >
+              <div className="pt-0.5">
+                <input
+                  checked={whatsappPayment}
+                  readOnly
+                  className="w-4 h-4 rounded text-[#104945] focus:ring-0 focus:ring-offset-0 border-[#B5C2BC] cursor-pointer"
+                  type="checkbox"
+                />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[#182622]">WhatsApp Payment</span>
+                  <span className="text-[10px] bg-[#E3F2E9] text-[#1D744C] px-1.5 py-0.2 rounded font-medium">
+                    Direct Chat
+                  </span>
                 </div>
-
-                {/* Cash on Delivery Toggle */}
-                <div
-                  onClick={() => setCodPayment(!codPayment)}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer select-none ${
-                    codPayment
-                      ? "border-slate-500/30 bg-slate-50/40 text-slate-900"
-                      : "border-neutral-200 hover:border-neutral-300 text-neutral-600"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={codPayment}
-                      readOnly
-                      className="h-4.5 w-4.5 rounded border-neutral-300 text-slate-600 focus:ring-slate-500 cursor-pointer"
-                    />
-                    <div className="text-left flex items-center gap-2">
-                      <Banknote size={18} className={codPayment ? "text-emerald-600" : "text-neutral-400"} />
-                      <div>
-                        <span className="block font-bold text-sm">Cash on Delivery (COD)</span>
-                        <span className="block text-[11px] text-neutral-400 font-medium">Allow customers to pay cash when their order is delivered.</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-[11px] text-[#717E79]">Place order and text details via WhatsApp</p>
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={savingPayment}
-                className={`w-full sm:w-auto px-6 h-12 rounded-xl font-bold text-white text-sm tracking-wide flex items-center justify-center gap-2 shadow-md transition-all ${
-                  savingPayment
-                    ? "bg-neutral-300 text-neutral-500 cursor-not-allowed shadow-none"
-                    : "bg-amber-600 hover:bg-amber-700 active:scale-[0.99] cursor-pointer"
-                }`}
-              >
-                {savingPayment ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Saving Settings...
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} /> Save Payment Settings
-                  </>
-                )}
-              </button>
+            {/* Method 2: Razorpay Payment */}
+            <div
+              onClick={() => setRazorpayPayment(!razorpayPayment)}
+              className="flex items-start gap-3 p-3.5 rounded-xl border border-[#DFE7E2] bg-[#FAFCFB] hover:border-[#104945] cursor-pointer transition-all select-none"
+            >
+              <div className="pt-0.5">
+                <input
+                  checked={razorpayPayment}
+                  readOnly
+                  className="w-4 h-4 rounded text-[#104945] focus:ring-0 focus:ring-offset-0 border-[#B5C2BC] cursor-pointer"
+                  type="checkbox"
+                />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[#182622]">Razorpay Payment</span>
+                  <span className="text-[10px] bg-[#D8EAE6] text-[#175C54] px-1.5 py-0.2 rounded font-medium">
+                    Card/UPI/Netbanking
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#717E79]">Secure online payments via Razorpay card/UPI</p>
+              </div>
             </div>
-          </form>
-        </div>
+          </div>
 
-        {/* SHIPPING ESTIMATE CARD */}
-        <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)] overflow-hidden">
-          <form onSubmit={handleSaveShipping} className="p-6 md:p-8 space-y-6">
-            <div className="border-b border-neutral-100 pb-4">
-              <h2 className="text-xl font-bold text-neutral-800 flex items-center gap-2">
-                <Truck className="text-amber-600" size={22} /> Shipping Estimate
-              </h2>
-              <p className="text-neutral-500 text-sm mt-1">
+          {/* Method 3: Cash on Delivery (COD) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            <div
+              onClick={() => setCodPayment(!codPayment)}
+              className="flex items-start gap-3 p-3.5 rounded-xl border border-[#DFE7E2] bg-[#FAFCFB] hover:border-[#104945] cursor-pointer transition-all select-none"
+            >
+              <div className="pt-0.5">
+                <input
+                  checked={codPayment}
+                  readOnly
+                  className="w-4 h-4 rounded text-[#104945] focus:ring-0 focus:ring-offset-0 border-[#B5C2BC] cursor-pointer"
+                  type="checkbox"
+                />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <Banknote className="w-3.5 h-3.5 text-[#52605B]" />
+                  <span className="text-xs font-bold text-[#182622]">Cash on Delivery (COD)</span>
+                </div>
+                <p className="text-[11px] text-[#717E79]">Allow customers to pay cash when their order is delivered.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={savingPayment}
+              className="inline-flex items-center gap-2 bg-[#1B4332] hover:bg-[#123023] text-white px-4 py-2 rounded-xl text-xs font-medium shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {savingPayment ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" strokeLinecap="round" strokeLinejoin="round"></path>
+                  </svg>
+                  <span>Save Payment Settings</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* ── BEGIN: Card2 - Shipping Estimate ── */}
+      <section
+        className="bg-white rounded-3xl p-6 md:p-7 border border-[#E2DBD0] shadow-sm"
+        data-purpose="shipping-estimate-card"
+      >
+        <form onSubmit={handleSaveShipping}>
+          {/* Header */}
+          <div className="flex items-start gap-3.5 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-[#EAF2ED] text-[#104945] flex items-center justify-center shrink-0">
+              <Truck className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#14211D]">Shipping Estimate</h3>
+              <p className="text-xs text-[#6A7771] mt-0.5">
                 Define the minimum order value required for free shipping and the flat shipping fee applied below that threshold. These values are read server-side during payment computation.
               </p>
             </div>
+          </div>
 
-            {/* Live preview badge */}
-            <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-100">
-              <PackageCheck className="text-amber-600 flex-shrink-0" size={20} />
-              <p className="text-sm font-medium text-amber-800">
-                Current rule: Orders above <strong>₹{freeShippingThreshold}</strong> get <strong>free shipping</strong>; orders below pay <strong>₹{shippingCost}</strong> shipping.
-              </p>
-            </div>
+          {/* Info Notification Bar */}
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[#EAF4F2] border border-[#BDDCD5] mb-5 text-xs text-[#1C4E48]">
+            <svg className="w-4 h-4 shrink-0 text-[#144741]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeLinecap="round" strokeLinejoin="round"></path>
+            </svg>
+            <span>
+              Current rule: Orders above <strong className="font-bold">₹{freeShippingThreshold}</strong> get <strong className="font-bold">free shipping</strong>; orders below pay <strong className="font-bold">₹{shippingCost}</strong> shipping.
+            </span>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* Free Shipping Threshold */}
-              <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2.5">
-                  Free Shipping Threshold (₹)
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500 font-bold text-sm">₹</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    required
-                    value={freeShippingThreshold}
-                    onChange={(e) => setFreeShippingThreshold(e.target.value)}
-                    placeholder="e.g. 500"
-                    className="w-full h-12 pl-8 pr-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-semibold"
-                  />
-                </div>
-                <p className="text-[11px] text-neutral-400 mt-1.5 font-medium">Orders at or above this amount qualify for free delivery.</p>
+          {/* Input Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                Free Shipping Threshold (₹)
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs text-gray-500 font-medium">₹</span>
+                <input
+                  className="w-full pl-7 pr-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                  type="number"
+                  min="0"
+                  step="1"
+                  required
+                  placeholder="e.g. 500"
+                  value={freeShippingThreshold}
+                  onChange={(e) => setFreeShippingThreshold(e.target.value)}
+                />
               </div>
-
-              {/* Shipping Cost */}
-              <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2.5">
-                  Shipping Cost (₹)
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500 font-bold text-sm">₹</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    required
-                    value={shippingCost}
-                    onChange={(e) => setShippingCost(e.target.value)}
-                    placeholder="e.g. 49"
-                    className="w-full h-12 pl-8 pr-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-semibold"
-                  />
-                </div>
-                <p className="text-[11px] text-neutral-400 mt-1.5 font-medium">Flat fee charged on orders below the free shipping threshold.</p>
+              <p className="text-[11px] text-[#7A8681] mt-1">Orders at or above this amount qualify for free delivery.</p>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                Shipping Cost (₹)
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs text-gray-500 font-medium">₹</span>
+                <input
+                  className="w-full pl-7 pr-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                  type="number"
+                  min="0"
+                  step="1"
+                  required
+                  placeholder="e.g. 49"
+                  value={shippingCost}
+                  onChange={(e) => setShippingCost(e.target.value)}
+                />
               </div>
+              <p className="text-[11px] text-[#7A8681] mt-1">Flat fee charged on orders below the free shipping threshold.</p>
             </div>
+          </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={savingShipping}
-                className={`w-full sm:w-auto px-6 h-12 rounded-xl font-bold text-white text-sm tracking-wide flex items-center justify-center gap-2 shadow-md transition-all ${
-                  savingShipping
-                    ? "bg-neutral-300 text-neutral-500 cursor-not-allowed shadow-none"
-                    : "bg-amber-600 hover:bg-amber-700 active:scale-[0.99] cursor-pointer"
-                }`}
-              >
-                {savingShipping ? (
-                  <><Loader2 size={16} className="animate-spin" /> Saving...
-                  </>) : (
-                  <><Save size={16} /> Save Shipping Settings
-                  </>)}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* RETURN & EXCHANGE DEFAULTS CARD (Phase 2) — loads and saves settings.returnPolicyDefaults by itself */}
-        <ReturnPolicyDefaultsCard />
-
-        {/* COURIERS + TRACKING LINKS (shipping, Phase 5) */}
-        <CouriersCard />
-
-        {/* RETURN & EXCHANGE REASONS (Phase 7: the configurable list the customer picks from) */}
-        <RequestReasonsCard />
-
-        {/* GST SETTINGS CARD */}
-        <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)] overflow-hidden">
-          <form onSubmit={handleSaveGst} className="p-6 md:p-8 space-y-6">
-            <div className="border-b border-neutral-100 pb-4">
-              <h2 className="text-xl font-bold text-neutral-800 flex items-center gap-2">
-                <ShieldCheck className="text-amber-600" size={22} /> GST Settings
-              </h2>
-              <p className="text-neutral-500 text-sm mt-1">
-                Control whether GST (Goods & Services Tax) is applied across your store.
-                When disabled, prices are treated as final — no tax breakdown appears anywhere
-                (invoices, cart, order details).
-              </p>
-            </div>
-
-            {/* Big toggle */}
-            <div
-              onClick={() => setGstEnabled(!gstEnabled)}
-              className="flex items-center justify-between p-5 rounded-2xl border-2 cursor-pointer select-none transition-all"
-              style={{
-                borderColor: gstEnabled ? "#10b981" : "#e5e7eb",
-                background: gstEnabled ? "#f0fdf4" : "#f9fafb",
-              }}
+          {/* Action Button */}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={savingShipping}
+              className="inline-flex items-center gap-2 bg-[#1B4332] hover:bg-[#123023] text-white px-4 py-2 rounded-xl text-xs font-medium shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
-              <div className="flex items-center gap-4">
-                <div
-                  className="flex items-center justify-center w-12 h-12 rounded-2xl"
-                  style={{ background: gstEnabled ? "#dcfce7" : "#f3f4f6" }}
-                >
-                  <ShieldCheck size={24} style={{ color: gstEnabled ? "#10b981" : "#9ca3af" }} />
-                </div>
-                <div>
-                  <p className="font-bold text-neutral-800 text-base">
-                    GST is currently <span style={{ color: gstEnabled ? "#10b981" : "#ef4444" }}>{gstEnabled ? "ENABLED" : "DISABLED"}</span>
-                  </p>
-                  <p className="text-sm text-neutral-500 mt-0.5">
-                    {gstEnabled
-                      ? "Tax is computed per product and shown in invoices, cart and order details."
-                      : "GST is ignored. Product price = final price. No tax details anywhere."}
-                  </p>
-                </div>
-              </div>
-              {gstEnabled
-                ? <ToggleRight size={48} className="flex-shrink-0" style={{ color: "#10b981" }} />
-                : <ToggleLeft  size={48} className="flex-shrink-0" style={{ color: "#9ca3af" }} />
-              }
-            </div>
+              {savingShipping ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" strokeLinecap="round" strokeLinejoin="round"></path>
+                  </svg>
+                  <span>Save Shipping Settings</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </section>
 
-            {/* Info boxes */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className={`p-4 rounded-xl border transition-all ${
-                gstEnabled ? "border-emerald-200 bg-emerald-50/40" : "border-neutral-200 bg-neutral-50 opacity-50"
-              }`}>
-                <p className="font-bold text-sm text-emerald-700 mb-1">When GST is ON</p>
-                <ul className="text-xs text-neutral-600 space-y-1 list-disc list-inside">
-                  <li>Tax breakdown in invoices (CGST / SGST / IGST)</li>
-                  <li>&ldquo;Tax included in price&rdquo; shown in cart</li>
-                  <li>Taxable value & GST amounts shown in order details</li>
-                  <li>HSN codes & GST% columns in invoice PDF</li>
-                </ul>
-              </div>
-              <div className={`p-4 rounded-xl border transition-all ${
-                !gstEnabled ? "border-red-200 bg-red-50/40" : "border-neutral-200 bg-neutral-50 opacity-50"
-              }`}>
-                <p className="font-bold text-sm text-red-600 mb-1">When GST is OFF</p>
-                <ul className="text-xs text-neutral-600 space-y-1 list-disc list-inside">
-                  <li>Product price = total price, GST fields ignored</li>
-                  <li>No tax row in cart or order summary</li>
-                  <li>Invoice PDF shows simple price table only</li>
-                  <li>No CGST / SGST / IGST stored on new orders</li>
-                </ul>
-              </div>
+      {/* ── BEGIN: Card3 - GST Settings ── */}
+      <section
+        className="bg-white rounded-3xl p-6 md:p-7 border border-[#E2DBD0] shadow-sm"
+        data-purpose="gst-settings-card"
+      >
+        <form onSubmit={handleSaveGst}>
+          {/* Header */}
+          <div className="flex items-start gap-3.5 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-[#EAF2ED] text-[#104945] flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
             </div>
+            <div>
+              <h3 className="text-base font-bold text-[#14211D]">GST Settings</h3>
+              <p className="text-xs text-[#6A7771] mt-0.5">
+                Control whether GST (Goods & Services Tax) is applied across your store. When disabled, prices are treated as final — no tax breakdown appears anywhere (invoices, cart, order details).
+              </p>
+            </div>
+          </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={savingGst}
-                className={`flex items-center gap-2 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all ${
-                  savingGst
-                    ? "opacity-50 cursor-not-allowed bg-amber-400"
-                    : "bg-amber-600 hover:bg-amber-700 active:scale-[0.99] cursor-pointer"
+          {/* Status Toggle Banner */}
+          <div
+            onClick={() => setGstEnabled(!gstEnabled)}
+            className={`flex items-center justify-between p-3.5 rounded-2xl mb-5 border transition-all cursor-pointer select-none ${
+              gstEnabled
+                ? "bg-[#ECFDF5] border-[#A7F3D0]"
+                : "bg-[#FBF9F6] border-[#E5DFD4]"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                  gstEnabled
+                    ? "bg-[#D1FAE5] text-[#065F46]"
+                    : "bg-gray-100 text-gray-400"
                 }`}
               >
-                {savingGst ? (
-                  <><Loader2 size={16} className="animate-spin" /> Saving...</>
-                ) : (
-                  <><Save size={16} /> Save GST Settings</>
-                )}
-              </button>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"></path>
+                </svg>
+              </div>
+              <div>
+                <p className={`text-xs font-bold ${gstEnabled ? "text-[#064E3B]" : "text-gray-800"}`}>
+                  GST is currently{" "}
+                  <span className={gstEnabled ? "text-[#059669]" : "text-gray-500"}>
+                    {gstEnabled ? "Enabled" : "Disabled"}
+                  </span>
+                </p>
+                <p className={`text-[11px] ${gstEnabled ? "text-[#047857]" : "text-gray-500"}`}>
+                  {gstEnabled
+                    ? "Tax is computed per product and shown in invoices, cart and order details."
+                    : "GST is ignored. Product price = final price. No tax details anywhere."}
+                </p>
+              </div>
             </div>
-          </form>
-        </div>
 
-        {/* INVOICE SETTINGS CARD */}
-        <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)] overflow-hidden">
-          <form onSubmit={handleSaveInvoice} className="p-6 md:p-8 space-y-6">
-            <div className="border-b border-neutral-100 pb-4">
-              <h2 className="text-xl font-bold text-neutral-800 flex items-center gap-2">
-                <Receipt className="text-amber-600" size={22} /> Invoice Settings
-              </h2>
-              <p className="text-neutral-500 text-sm mt-1">
+            {/* Active Switch Toggle */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setGstEnabled(!gstEnabled)
+              }}
+              aria-label="Toggle GST"
+              className={`w-11 h-6 rounded-full p-0.5 flex items-center transition-colors cursor-pointer ${
+                gstEnabled ? "bg-[#104945] justify-end" : "bg-gray-300 justify-start"
+              }`}
+              type="button"
+            >
+              <span className="w-5 h-5 rounded-full bg-white shadow-md block"></span>
+            </button>
+          </div>
+
+          {/* Comparison Boxes: GST ON vs OFF */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Box: When GST is ON */}
+            <div
+              className={`p-4 rounded-2xl border transition-all ${
+                gstEnabled
+                  ? "border-[#D1FAE5] bg-[#F7FCF9]"
+                  : "border-[#E5DFD4] bg-[#FBF9F6] opacity-70"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <h5 className="text-xs font-bold text-[#1B382B]">When GST is ON</h5>
+              </div>
+              <ul className="text-[11px] text-[#4A5D54] space-y-1.5 list-disc list-inside">
+                <li>Tax breakdown in invoices (CGST / SGST / IGST)</li>
+                <li>&ldquo;Tax included in price&rdquo; shown in cart</li>
+                <li>Taxable value & GST amounts shown in order details</li>
+                <li>HSN codes & GST% columns in invoice PDF</li>
+              </ul>
+            </div>
+
+            {/* Box: When GST is OFF */}
+            <div
+              className={`p-4 rounded-2xl border transition-all ${
+                !gstEnabled
+                  ? "border-[#F8B4B4] bg-[#FEE2E2]/30"
+                  : "border-[#E5DFD4] bg-[#FBF9F6] opacity-70"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                <h5 className="text-xs font-bold text-[#3E4A45]">When GST is OFF</h5>
+              </div>
+              <ul className="text-[11px] text-[#63726B] space-y-1.5 list-disc list-inside">
+                <li>Product price = total price, GST fields ignored</li>
+                <li>No tax row in cart or order summary</li>
+                <li>Invoice PDF shows simple price table only</li>
+                <li>No CGST / SGST / IGST stored on new orders</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={savingGst}
+              className="inline-flex items-center gap-2 bg-[#1B4332] hover:bg-[#123023] text-white px-4 py-2 rounded-xl text-xs font-medium shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {savingGst ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" strokeLinecap="round" strokeLinejoin="round"></path>
+                  </svg>
+                  <span>Save GST Settings</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* ── BEGIN: Card4 - Invoice Settings ── */}
+      <section
+        className="bg-white rounded-3xl p-6 md:p-7 border border-[#E2DBD0] shadow-sm"
+        data-purpose="invoice-settings-card"
+      >
+        <form onSubmit={handleSaveInvoice}>
+          {/* Header */}
+          <div className="flex items-start gap-3.5 mb-6">
+            <div className="w-9 h-9 rounded-xl bg-[#EAF2ED] text-[#104945] flex items-center justify-center shrink-0">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#14211D]">Invoice Settings</h3>
+              <p className="text-xs text-[#6A7771] mt-0.5">
                 Customize values shown inside tax invoices generated dynamically. Empty optional fields will be hidden in the PDF layout.
               </p>
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Company Name */}
+          {/* Form Fields Grid */}
+          <div className="space-y-4 mb-6">
+            {/* Row 1: Company Name & Logo URL */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Building size={14} className="text-neutral-400" /> Company Name <span className="text-red-500">*</span>
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <Building className="w-3 h-3 text-[#798580]" />
+                  <span>Company Name <span className="text-red-500">*</span></span>
                 </label>
                 <input
-                  type="text"
                   required
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="e.g. Nexus Commerce Pvt. Ltd."
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-semibold"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                  type="text"
                 />
               </div>
-
-              {/* Logo URL */}
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <ImageIcon size={14} className="text-neutral-400" /> Logo URL (optional)
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <ImageIcon className="w-3 h-3 text-[#798580]" />
+                  <span>Logo URL (Optional)</span>
                 </label>
                 <input
-                  type="url"
                   value={logo}
                   onChange={(e) => setLogo(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
                   placeholder="e.g. https://domain.com/logo.png"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium"
+                  type="text"
                 />
               </div>
+            </div>
 
-              {/* Company Address */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <MapPin size={14} className="text-neutral-400" /> Company Address
-                </label>
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Full physical billing location details"
-                  rows={2}
-                  className="w-full p-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium resize-none"
-                />
-              </div>
+            {/* Row 2: Company Address (Full Width) */}
+            <div>
+              <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                <MapPin className="w-3 h-3 text-[#798580]" />
+                <span>Company Address</span>
+              </label>
+              <input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Full physical billing location details"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                type="text"
+              />
+            </div>
 
-              {/* Company Mobile */}
+            {/* Row 3: Company Mobile & Company Email */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Phone size={14} className="text-neutral-400" /> Company Mobile
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <Phone className="w-3 h-3 text-[#798580]" />
+                  <span>Company Mobile</span>
                 </label>
                 <input
-                  type="text"
                   value={mobile}
                   onChange={(e) => setMobile(e.target.value)}
                   placeholder="e.g. +91 99405 74522"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                  type="text"
                 />
               </div>
-
-              {/* Company Email */}
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Mail size={14} className="text-neutral-400" /> Company Email
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <Mail className="w-3 h-3 text-[#798580]" />
+                  <span>Company Email</span>
                 </label>
                 <input
-                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="e.g. billing@company.com"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                  type="email"
                 />
               </div>
+            </div>
 
-              {/* GSTIN Number */}
+            {/* Row 4: GSTIN Number & Seller State */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <FileText size={14} className="text-neutral-400" /> GSTIN Number
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <FileText className="w-3 h-3 text-[#798580]" />
+                  <span>GSTIN Number</span>
                 </label>
                 <input
-                  type="text"
                   value={gstin}
                   onChange={(e) => setGstin(e.target.value)}
                   placeholder="e.g. 29ABCDE1234F1Z5"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-semibold uppercase"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none uppercase font-semibold"
+                  type="text"
                 />
               </div>
-
-              {/* Seller State (for GST CGST/SGST vs IGST determination) */}
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <FileText size={14} className="text-neutral-400" /> Seller State
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <MapPin className="w-3 h-3 text-[#798580]" />
+                  <span>Seller State</span>
                 </label>
                 <input
-                  type="text"
                   value={sellerState}
                   onChange={(e) => setSellerState(e.target.value)}
                   placeholder="e.g. Tamil Nadu"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                  type="text"
                 />
-                <p className="text-xs text-neutral-500 mt-1">Used to split GST: same state as the buyer → CGST + SGST, different state → IGST.</p>
+                <p className="text-[10px] text-[#7E8B85] mt-1">
+                  Used to split GST: same state as buyer → CGST + SGST, different state → IGST.
+                </p>
               </div>
+            </div>
 
-              {/* Website */}
+            {/* Row 5: Website & Footer Heading */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Globe size={14} className="text-neutral-400" /> Website
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <Globe className="w-3 h-3 text-[#798580]" />
+                  <span>Website</span>
                 </label>
                 <input
-                  type="url"
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
                   placeholder="e.g. https://www.company.com"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                  type="url"
                 />
               </div>
-
-              {/* Invoice Footer Heading */}
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Heading size={14} className="text-neutral-400" /> Footer Heading
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <span className="font-serif font-black text-xs text-[#798580]">H</span>
+                  <span>Footer Heading</span>
                 </label>
                 <input
-                  type="text"
                   value={footerTitle}
                   onChange={(e) => setFooterTitle(e.target.value)}
                   placeholder="Thank You!"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium"
-                />
-              </div>
-
-              {/* Footer Sub Note */}
-              <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Info size={14} className="text-neutral-400" /> Footer Sub Note
-                </label>
-                <input
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
                   type="text"
-                  value={footerSubNote}
-                  onChange={(e) => setFooterSubNote(e.target.value)}
-                  placeholder="We appreciate your business. Visit Again."
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium"
                 />
               </div>
+            </div>
 
-              {/* Support Email */}
+            {/* Row 6: Footer Sub Note (Full Width) */}
+            <div>
+              <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                <Info className="w-3 h-3 text-[#798580]" />
+                <span>Footer Sub Note</span>
+              </label>
+              <input
+                value={footerSubNote}
+                onChange={(e) => setFooterSubNote(e.target.value)}
+                placeholder="We appreciate your business. Visit Again."
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                type="text"
+              />
+            </div>
+
+            {/* Row 7: Support Email & Support Phone */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Mail size={14} className="text-neutral-400" /> Support Email
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <Mail className="w-3 h-3 text-[#798580]" />
+                  <span>Support Email</span>
                 </label>
                 <input
-                  type="email"
                   value={supportEmail}
                   onChange={(e) => setSupportEmail(e.target.value)}
                   placeholder="e.g. support@company.com"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                  type="email"
                 />
               </div>
-
-              {/* Support Phone */}
               <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Phone size={14} className="text-neutral-400" /> Support Phone
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                  <Phone className="w-3 h-3 text-[#798580]" />
+                  <span>Support Phone</span>
                 </label>
                 <input
-                  type="text"
                   value={supportPhone}
                   onChange={(e) => setSupportPhone(e.target.value)}
                   placeholder="e.g. +91 80 4000 1234"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-medium"
-                />
-              </div>
-
-              {/* UPI ID */}
-              <div>
-                <label className="block text-sm font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <DollarSign size={14} className="text-neutral-400" /> UPI ID (optional)
-                </label>
-                <input
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
                   type="text"
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="e.g. company@upi"
-                  className="w-full h-12 px-4 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base font-semibold"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-neutral-100">
-              <button
-                type="submit"
-                disabled={savingInvoice}
-                className={`w-full sm:w-auto px-8 h-12 rounded-xl font-bold text-white text-sm tracking-wide flex items-center justify-center gap-2 shadow-md transition-all ${
-                  savingInvoice
-                    ? "bg-neutral-300 text-neutral-500 cursor-not-allowed shadow-none"
-                    : "bg-amber-600 hover:bg-amber-700 active:scale-[0.99] cursor-pointer"
-                }`}
-              >
-                {savingInvoice ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Saving Settings...
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} /> Save Invoice Settings
-                  </>
-                )}
-              </button>
+            {/* Row 8: UPI ID (Optional) (Full Width) */}
+            <div>
+              <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                <span className="font-sans font-bold text-xs text-[#798580]">₹</span>
+                <span>UPI ID (Optional)</span>
+              </label>
+              <input
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] placeholder-[#9AA5A0] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                placeholder="e.g. company@upi"
+                type="text"
+              />
             </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-};
+          </div>
 
-export default Optimization;
+          {/* Action Button */}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={savingInvoice}
+              className="inline-flex items-center gap-2 bg-[#1B4332] hover:bg-[#123023] text-white px-4 py-2 rounded-xl text-xs font-medium shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {savingInvoice ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" strokeLinecap="round" strokeLinejoin="round"></path>
+                  </svg>
+                  <span>Save Invoice Settings</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* ── Advanced Store Policies, Couriers & Reasons (Collapsible) ── */}
+      <div className="pt-2">
+        <button
+          onClick={() => setShowAdvancedPolicies((o) => !o)}
+          type="button"
+          className="w-full bg-white rounded-2xl px-5 py-3.5 border border-[#E2DBD0] shadow-sm flex items-center justify-between text-xs font-bold text-[#14211D] hover:bg-[#FAF9F7] transition cursor-pointer"
+        >
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-[#104945]" />
+            <span>Advanced Policies, Couriers & Return Reasons</span>
+          </div>
+          {showAdvancedPolicies ? (
+            <ChevronUp className="w-4 h-4 text-gray-500" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-500" />
+          )}
+        </button>
+
+        {showAdvancedPolicies && (
+          <div className="space-y-5 mt-4">
+            <ReturnPolicyDefaultsCard />
+            <CouriersCard />
+            <RequestReasonsCard />
+          </div>
+        )}
+      </div>
+    </main>
+  )
+}
+
+export default Optimization

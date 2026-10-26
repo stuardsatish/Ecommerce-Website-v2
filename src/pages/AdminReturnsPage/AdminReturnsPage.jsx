@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+﻿import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { RotateCcw, Search } from "lucide-react"
 import { supabase } from "../../context/SupabaseConfig"
@@ -74,53 +74,70 @@ const AdminReturnsPage = () => {
   [state.requests, tab, filter, q])
   const selected = state.requests.find((r) => r.id === selectedId) || null
 
-  return (
-    <div style={{ background: "var(--color-background)", minHeight: "100vh", fontFamily: INTER, color: "var(--color-ink)" }}>
-      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "96px 24px 80px" }}>
-        <h1 className="flex items-center" style={{ gap: "10px", fontWeight: 800, fontSize: "30px", letterSpacing: "-0.6px" }}><RotateCcw size={26} style={{ color: "var(--color-primary)" }} /> Returns &amp; Exchanges</h1>
-        <p style={{ fontSize: "14px", color: "var(--color-body)", marginTop: "4px" }}>Review, decide, arrange the return, inspect. Nothing is refunded or restocked from this list directly.</p>
+  const FONT = "'Plus Jakarta Sans','Inter',sans-serif"
+  const INK  = "#171412"
+  const MUTED = "#78716C"
+  const TEAL = "#104945"
+  const TEAL_L = "#DDF0EB"
+  const BORDER = "#E6E0D8"
 
-        <div className="flex flex-wrap items-center" style={{ gap: "8px", margin: "22px 0 12px" }} role="tablist">
+  return (
+    <div style={{ minHeight: "100vh", fontFamily: FONT, color: INK }}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px 24px 80px" }}>
+
+        {/* Page header */}
+        <div style={{ marginBottom: "20px" }}>
+          <p style={{ fontSize: "11px", color: MUTED, fontWeight: 500, marginBottom: "2px" }}>Post-order management</p>
+          <h1 style={{ fontSize: "26px", fontWeight: 800, color: INK, letterSpacing: "-0.5px", margin: 0 }}>Returns &amp; Exchanges</h1>
+          <p style={{ fontSize: "13px", color: MUTED, marginTop: "4px" }}>Review, decide, arrange the return, inspect. Nothing is refunded or restocked from this list directly.</p>
+        </div>
+
+        {/* Tab switcher — Pelago pill style */}
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "16px", background: "#EDE8E2", borderRadius: "999px", padding: "3px", width: "fit-content" }} role="tablist">
           {TABS.map((t) => (
             <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => update({ tab: t.key, open: "" })}
-              style={{ padding: "10px 18px", borderRadius: "12px", fontWeight: 700, fontSize: "14px", cursor: "pointer", background: tab === t.key ? "var(--color-primary)" : "var(--color-surface)", color: tab === t.key ? "var(--color-inverse)" : "var(--color-body)", border: "1px solid var(--color-border)" }}>
+              style={{ padding: "6px 16px", borderRadius: "999px", fontWeight: tab === t.key ? 700 : 500, fontSize: "13px", cursor: "pointer", background: tab === t.key ? "#fff" : "transparent", color: tab === t.key ? INK : MUTED, border: "none", boxShadow: tab === t.key ? "0 1px 2px rgba(0,0,0,0.08)" : "none", fontFamily: FONT, display: "flex", alignItems: "center", gap: "6px" }}>
               {t.title}
-              {counts[t.key].action > 0 ? <span style={{ marginLeft: "8px", background: tab === t.key ? "var(--color-inverse)" : "var(--color-primary)", color: tab === t.key ? "var(--color-primary)" : "var(--color-inverse)", borderRadius: "9999px", padding: "1px 8px", fontSize: "12px" }}>{counts[t.key].action}</span> : null}
+              {counts[t.key].action > 0 ? <span style={{ background: TEAL, color: "#fff", borderRadius: "999px", padding: "1px 7px", fontSize: "11px" }}>{counts[t.key].action}</span> : null}
             </button>
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between" style={{ gap: "10px", marginBottom: "16px" }}>
-          <div className="flex flex-wrap" style={{ gap: "6px" }}>
+        {/* Filter + search bar */}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "16px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
             {FILTERS.map((f) => (
               <button key={f.key} aria-pressed={filterKey === f.key} onClick={() => update({ status: f.key === "action" ? "" : f.key, open: "" })}
-                style={{ padding: "6px 14px", borderRadius: "9999px", fontSize: "13px", fontWeight: 600, cursor: "pointer", background: filterKey === f.key ? "var(--color-ink)" : "var(--color-surface-muted)", color: filterKey === f.key ? "var(--color-inverse)" : "var(--color-body)" }}>{f.label}</button>
+                style={{ padding: "5px 14px", borderRadius: "999px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer", background: filterKey === f.key ? TEAL : "#F7F5F2", color: filterKey === f.key ? "#fff" : MUTED, border: filterKey === f.key ? "none" : `1px solid ${BORDER}`, fontFamily: FONT }}>{f.label}</button>
             ))}
           </div>
-          <label className="flex items-center" style={{ gap: "8px", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "0 12px", height: "40px" }}>
-            <Search size={15} style={{ color: "var(--color-muted)" }} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Request no, order id, customer" aria-label="Search requests" style={{ border: "none", outline: "none", background: "transparent", fontSize: "14px", width: "240px" }} />
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: "999px", padding: "0 14px", height: "36px" }}>
+            <Search size={14} style={{ color: MUTED }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Request no, order id, customer" aria-label="Search requests" style={{ border: "none", outline: "none", background: "transparent", fontSize: "13px", width: "220px", fontFamily: FONT }} />
           </label>
         </div>
 
+        {/* Content */}
         {state.loading ? (
-          <div className="animate-pulse flex flex-col" style={{ gap: "10px" }}>{[0, 1, 2].map((i) => <div key={i} style={{ height: "76px", borderRadius: "14px", background: "var(--color-border)" }} />)}</div>
+          <div className="animate-pulse flex flex-col" style={{ gap: "10px" }}>{[0, 1, 2].map((i) => <div key={i} style={{ height: "76px", borderRadius: "14px", background: "#E9E4DD" }} />)}</div>
         ) : state.error ? (
-          <p style={{ color: "var(--color-error)", fontSize: "14px" }}>{state.error}</p>
+          <p style={{ color: "#EF4444", fontSize: "14px" }}>{state.error}</p>
         ) : shown.length === 0 ? (
-          <div className="flex flex-col items-center text-center" style={{ border: "2px dashed var(--color-border)", borderRadius: "24px", padding: "56px 20px", gap: "6px" }}>
-            <RotateCcw size={40} style={{ color: "var(--color-border-strong)" }} />
-            <p style={{ fontWeight: 800, fontSize: "20px" }}>No {tab} requests here</p>
-            <p style={{ fontSize: "14px", color: "var(--color-body)" }}>{filterKey === "action" ? "Nothing needs your action right now." : "Nothing matches this filter."}</p>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", border: `2px dashed ${BORDER}`, borderRadius: "20px", padding: "56px 20px", gap: "6px" }}>
+            <RotateCcw size={40} style={{ color: BORDER }} />
+            <p style={{ fontWeight: 800, fontSize: "20px", color: INK }}>No {tab} requests here</p>
+            <p style={{ fontSize: "13px", color: MUTED }}>{filterKey === "action" ? "Nothing needs your action right now." : "Nothing matches this filter."}</p>
           </div>
         ) : (
-          <div className="flex flex-col" style={{ gap: "10px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {shown.map((r) => (
-              <button key={r.id} onClick={() => update({ open: r.id })} className="flex items-center justify-between flex-wrap" style={{ gap: "10px", textAlign: "left", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "14px", padding: "14px 18px", cursor: "pointer", width: "100%" }}>
-                <span className="flex flex-col" style={{ minWidth: 0, gap: "2px" }}>
-                  <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: "14px" }}>{r.requestNo}</span>
-                  <span style={{ fontSize: "13px", color: "var(--color-body)" }}>{r.order?.customerName || "Guest"} · order {String(r.orderId).slice(-10)} · {r.items.length} item{r.items.length === 1 ? "" : "s"}: {r.items.map((i) => `${i.title}${i.variantName ? ` (${i.variantName})` : ""} x${i.quantity}`).join(", ")}</span>
-                  <span style={{ fontSize: "12px", color: "var(--color-muted)" }}>{requestTypeLabel(r.type)} · {r.reasonCode.replace(/_/g, " ")} · {fmtDate(r.createdAt)} ({ageText(r.createdAt)})</span>
+              <button key={r.id} onClick={() => update({ open: r.id })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", textAlign: "left", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: "14px", padding: "14px 18px", cursor: "pointer", width: "100%", fontFamily: FONT, transition: "background 0.1s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#FAF8F5"}
+                onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
+                <span style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: "2px" }}>
+                  <span style={{ fontWeight: 800, fontSize: "13px", color: INK }}>{r.requestNo}</span>
+                  <span style={{ fontSize: "12.5px", color: "#44403C" }}>{r.order?.customerName || "Guest"} · order {String(r.orderId).slice(-10)} · {r.items.length} item{r.items.length === 1 ? "" : "s"}: {r.items.map((i) => `${i.title}${i.variantName ? ` (${i.variantName})` : ""} x${i.quantity}`).join(", ")}</span>
+                  <span style={{ fontSize: "11.5px", color: MUTED }}>{requestTypeLabel(r.type)} · {r.reasonCode.replace(/_/g, " ")} · {fmtDate(r.createdAt)} ({ageText(r.createdAt)})</span>
                 </span>
                 <RequestStatusChip status={r.status} staff />
               </button>
@@ -134,6 +151,7 @@ const AdminReturnsPage = () => {
       </RightDrawer>
     </div>
   )
+
 }
 
 export default AdminReturnsPage

@@ -19,9 +19,12 @@ const LoginPage = lazy(() => import("./pages/LoginPage/LoginPage"))
 const SignupPage = lazy(() => import("./pages/SignupPage/SignupPage"))
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage/ResetPasswordPage"))
 const AdminOrdersPage = lazy(() => import("./pages/AdminOrdersPage/AdminOrdersPage"))
+const OrdersHubPage = lazy(() => import("./pages/AdminOrdersPage/OrdersHubPage"))
 const WishlistPage = lazy(() => import("./pages/WishlistPage/WishlistPage"))
 const UsersPage = lazy(() => import("./pages/UsersPage/UsersPage"))
+const CustomersHubPage = lazy(() => import("./pages/UsersPage/CustomersHubPage"))
 const AddProductPage = lazy(() => import("./pages/AddProductPage/AddProductPage"))
+const ProductsHubPage = lazy(() => import("./pages/AddProductPage/ProductsHubPage"))
 const AddDiscountPage = lazy(() => import("./pages/AddDiscountPage/AddDiscountPage"))
 const EditProductPage = lazy(() => import("./pages/EditProductPage/EditProductPage"))
 const UserOrdersPage = lazy(() => import("./pages/UserOrdersPage/UserOrdersPage"))
@@ -40,10 +43,12 @@ const AdminReturnsPage = lazy(() => import("./pages/AdminReturnsPage/AdminReturn
 const AdminInventoryPage = lazy(() => import("./pages/AdminInventoryPage/AdminInventoryPage"))
 const MyReturnsPage = lazy(() => import("./pages/MyReturnsPage/MyReturnsPage"))
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage/NotificationsPage"))
+const AdminDashboard = lazy(() => import("./pages/Dashboard/AdminDashboard"))
 
 import Loader from "./components/Common/Loader"
 import Navbar from "./components/Layout/Navbar"
 import MobileNav from "./components/Layout/MobileNav"
+import AdminLayout from "./components/Layout/AdminLayout"
 import SessionManager from "./components/SessionManager"
 import useSessionWatcher from "./hooks/useSessionWatcher"
 
@@ -67,14 +72,23 @@ import AdminRoute from "./routes/AdminRoute"
 // never sits underneath it. Skipped on the full-bleed hero routes (landing /
 // video) where the nav intentionally overlays the hero, and hidden on small
 // screens where the floating nav retracts on shell routes (those pages render
-// their own TopAppBar).
+// their own TopAppBar). Also hidden on admin routes which use the sidebar layout.
 const FULL_BLEED_ROUTES = ["/", "/video"]
+const ADMIN_ROUTE_PREFIX = "/admin"
 const NavbarSpacer = () => {
   const { pathname } = useLocation()
   if (FULL_BLEED_ROUTES.includes(pathname)) return null
+  if (pathname.startsWith(ADMIN_ROUTE_PREFIX)) return null
   return <div aria-hidden="true" className="hidden sm:block" style={{ height: "88px" }} />
 }
 
+// Hides the floating Navbar and MobileNav on all /admin/* routes so the new
+// sidebar layout takes over navigation. Customer-facing routes are unaffected.
+const NavbarVisibilityGuard = ({ children }) => {
+  const { pathname } = useLocation()
+  if (pathname.startsWith(ADMIN_ROUTE_PREFIX)) return null
+  return children
+}
 
 const areCartItemsEqual = (arr1, arr2) => {
   if (!arr1 || !arr2) return false
@@ -314,8 +328,11 @@ const App = () => {
 
       <SessionManager />
 
-      <Navbar />
-      <MobileNav />
+      {/* Navbar and MobileNav are hidden on admin routes — the sidebar takes over */}
+      <NavbarVisibilityGuard>
+        <Navbar />
+        <MobileNav />
+      </NavbarVisibilityGuard>
       <NavbarSpacer />
 
       <Suspense fallback={<Loader />}>
@@ -359,31 +376,41 @@ const App = () => {
 
 
 
-          {/* ADMIN ROUTES */}
-          <Route path="/admin/users" element={<AdminRoute><UsersPage /></AdminRoute>} />
+          {/* ADMIN ROUTES — wrapped in AdminLayout (sidebar shell) */}
 
-          <Route path="/admin/add-product" element={<AdminRoute><AddProductPage /></AdminRoute>} />
+          {/* Dashboard — default admin home shown on login */}
+          <Route path="/admin/dashboard" element={<AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/allUsersOrdersAnalytics" element={<AdminRoute><AllUsersOrdersAnalytics /></AdminRoute>} />
+          {/* Orders Hub — 3 outer tabs: To Pack & Ship | All Orders | Returns */}
+          <Route path="/admin/myorders" element={<AdminRoute><AdminLayout><OrdersHubPage /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/allProductsOrdersAnalytics" element={<AdminRoute><AllProductsOrdersAnalytics /></AdminRoute>} />
+          {/* Customers Hub — 2 tabs: Everyone | Analytics */}
+          <Route path="/admin/users" element={<AdminRoute><AdminLayout><CustomersHubPage /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/adminUploadOrders" element={<AdminRoute><AdminUploadOrders /></AdminRoute>} />
+          {/* Products Hub — 2 tabs: Catalog | Analytics */}
+          <Route path="/admin/add-product" element={<AdminRoute><AdminLayout><ProductsHubPage /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/myorders" element={<AdminRoute><AdminOrdersPage /></AdminRoute>} />
+          <Route path="/admin/adminUploadOrders" element={<AdminRoute><AdminLayout><AdminUploadOrders /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/upload-orders" element={<AdminRoute><AdminLayout><AdminUploadOrders /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/returns" element={<AdminRoute><AdminReturnsPage /></AdminRoute>} />
-          <Route path="/admin/inventory" element={<AdminRoute><AdminInventoryPage /></AdminRoute>} />
+          <Route path="/admin/returns" element={<AdminRoute><AdminLayout><OrdersHubPage /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/add-discount" element={<AdminRoute><AddDiscountPage /></AdminRoute>} />
+          <Route path="/admin/inventory" element={<AdminRoute><AdminLayout><AdminInventoryPage /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/edit-product/:id" element={<AdminRoute><EditProductPage /></AdminRoute>} />
+          <Route path="/admin/add-discount" element={<AdminRoute><AdminLayout><AddDiscountPage /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/createOrders" element={<AdminRoute><CreateOrdersPage /></AdminRoute>} />
+          <Route path="/admin/edit-product/:id" element={<AdminRoute><AdminLayout><EditProductPage /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/billing" element={<AdminRoute><BillingPage /></AdminRoute>} />
+          <Route path="/admin/createOrders" element={<AdminRoute><AdminLayout><CreateOrdersPage /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/create-order" element={<AdminRoute><AdminLayout><CreateOrdersPage /></AdminLayout></AdminRoute>} />
 
-          <Route path="/admin/optimization" element={<AdminRoute><Optimization /></AdminRoute>} />
+          <Route path="/admin/billing" element={<AdminRoute><AdminLayout><BillingPage /></AdminLayout></AdminRoute>} />
+
+          <Route path="/admin/optimization" element={<AdminRoute><AdminLayout><Optimization /></AdminLayout></AdminRoute>} />
+
+          {/* Legacy analytics routes — redirect to hub tabs (kept for any existing bookmarks) */}
+          <Route path="/admin/allUsersOrdersAnalytics" element={<AdminRoute><AdminLayout><CustomersHubPage /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/allProductsOrdersAnalytics" element={<AdminRoute><AdminLayout><ProductsHubPage /></AdminLayout></AdminRoute>} />
 
         </Routes>
       </Suspense>

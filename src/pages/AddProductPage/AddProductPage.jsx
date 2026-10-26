@@ -8,6 +8,8 @@ import gsap from "gsap"
 import {
     Download, Plus, Search, Filter, LayoutGrid, List as ListIcon,
     Eye, Pencil, Trash2, UploadCloud, ChevronLeft, ChevronRight, Image as ImageIcon,
+    AlertTriangle, Package, Check, X, Tag, Layers, RefreshCw, FileSpreadsheet,
+    Moon, Bell, ChevronDown, SlidersHorizontal, ArrowUpDown,
 } from "lucide-react"
 import { PRODUCT_IMPORT_HEADERS, PRODUCT_IMPORT_SAMPLE_ROW } from "../../constants/productImportHeaders"
 import RightDrawer from "../../components/Common/RightDrawer"
@@ -15,25 +17,77 @@ import ProductTypeSection from "../../features/products/admin/ProductTypeSection
 import VariantManager from "../../features/products/admin/VariantManager"
 import PolicyFields from "../../features/products/admin/PolicyFields"
 import BulkProductImport from "../../features/bulkImport/BulkProductImport"
+import Pagination from "../../components/Pagination"
 import {
     POLICY_DEFAULTS, policyFromSettings, policyForCategory, categoryListsFromSettings, validateProduct, buildProductPayload, buildVariantPayload, explainSaveError,
 } from "../../features/products/admin/productForm"
 
-/* ============================== TOKENS ============================== */
-const C = {
-    indigo: "var(--color-error)", indigoDark: "var(--color-primary)", indigo2: "var(--color-error)",
-    greenBg: "var(--color-success-border)", greenText: "var(--color-success)", green: "var(--color-primary)",
-    blueBg: "var(--color-info-subtle)", blueText: "var(--color-body)",
-    redBg: "var(--color-error-subtle)", redText: "var(--color-error)", red: "var(--color-error)",
-    surface: "var(--color-surface-muted)", border: "var(--color-border)", chip: "var(--color-surface-muted)",
-    textP: "var(--color-ink)", textS: "var(--color-body)",
-}
-const GEIST = "'Geist', 'Inter', sans-serif"
-const INTER = "'Inter', sans-serif"
+/* ============================== PELAGO DESIGN TOKENS ============================== */
+const FONT = "'Plus Jakarta Sans', 'Inter', sans-serif"
+const MONO = "'JetBrains Mono', monospace"
 
-const PAGE_SIZE = 10
+const TEAL = "#104945"
+const TEAL_DARK = "#0C3936"
+const TEAL_LIGHT = "#DEEEE7"
+const TEAL_SUBTLE = "#E6F3F1"
+const BORDER = "#E2DBD0"
+const CANVAS = "#EDE8E1"
+const WHITE = "#FFFFFF"
+const CARD_BG = "#FFFFFF"
+const INK = "#171412"
+const MUTED = "#78716C"
+const MUTED_LIGHT = "#8C8478"
+const GREEN = "#167448"
+const RED = "#BE413B"
+const AMBER = "#D99726"
+
+const PAGE_SIZE = 28
 const EMPTY_FORM = { title: "", category: "", price: "", stock: "", brand: "", sku: "", shortDescription: "", description: "", gstRate: "0", hsnCode: "" }
 const GST_RATES = ["0", "5", "12", "18", "28"]
+
+const CATEGORY_ICONS = {
+    mugs: "☕", mug: "☕", cups: "☕", cup: "☕",
+    plates: "🍽", plate: "🍽", bowls: "🍽", bowl: "🍽",
+    vases: "🏺", vase: "🏺",
+    planters: "🪴", planter: "🪴", pots: "🪴",
+    teaware: "🫖", tea: "🫖",
+    linen: "🪡", cloth: "🪡",
+    sweets: "🍬", sweet: "🍬", groceries: "🍎", food: "🥗",
+    shirts: "👕", shirt: "👕", apparel: "👕", clothes: "👕",
+}
+const getCategoryIcon = (cat) => {
+    if (!cat) return "📦"
+    const k = cat.toLowerCase().trim()
+    return CATEGORY_ICONS[k] || "💧"
+}
+
+const CERAMIC_GRADIENTS = [
+    "from-[#214F4B] to-[#123632]",
+    "from-[#6A7873] to-[#45504C]",
+    "from-[#567562] to-[#3B5445]",
+    "from-[#1C4E51] to-[#123639]",
+    "from-[#CCC5B6] to-[#A39B8C]",
+    "from-[#4A241C] to-[#2B140F]",
+    "from-[#677F6A] to-[#455D49]",
+]
+
+const SORT_OPTIONS = [
+    { key: "bestselling", label: "Best selling" },
+    { key: "price_asc", label: "Price: Low to High" },
+    { key: "price_desc", label: "Price: High to Low" },
+    { key: "newest", label: "Newest arrivals" },
+    { key: "name_asc", label: "Alphabetical (A-Z)" },
+]
+
+const DATE_RANGES = [
+    { key: "today", label: "Today" },
+    { key: "7d", label: "Last 7 Days" },
+    { key: "30d", label: "Last 30 Days" },
+    { key: "90d", label: "Last 90 Days" },
+    { key: "6m", label: "Last 6 Months" },
+    { key: "all", label: "All Time" },
+    { key: "custom", label: "Custom" },
+]
 
 const toMillis = (v) => {
     if (!v) return 0
@@ -41,9 +95,16 @@ const toMillis = (v) => {
     const d = new Date(v)
     return isNaN(d.getTime()) ? 0 : d.getTime()
 }
-const money = (n) => `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const money = (n) => `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 
-const AddProductPage = () => {
+const AddProductPage = ({
+    activeTab = "catalog",
+    onSwitchTab,
+    showHeader = true,
+    onStatsChange,
+    actionsRef,
+    dateRange: propDateRange,
+}) => {
     const navigate = useNavigate()
 
     /* -------- product catalog state -------- */
@@ -51,6 +112,10 @@ const AddProductPage = () => {
     const [loading, setLoading] = useState(false)
     const [catalogLoading, setCatalogLoading] = useState(true)
     const [uploadProgress, setUploadProgress] = useState(0)
+
+    /* -------- form toggle -------- */
+    const [showAddForm, setShowAddForm] = useState(false)
+    const [showCsvImport, setShowCsvImport] = useState(false)
 
     /* -------- add-product form -------- */
     const [form, setForm] = useState(EMPTY_FORM)
@@ -62,32 +127,40 @@ const AddProductPage = () => {
     const [galleryPreviews, setGalleryPreviews] = useState([])
 
     /* -------- variant / combination product -------- */
-    // The variant editor (attribute generator, manual add, cards) lives in features/products/admin/VariantManager and
-    // owns its own UI state; the page keeps only what it needs to save.
-    const [productType, setProductType] = useState("single")   // "single" | "variant"
-    const [attributes, setAttributes] = useState([])           // [{ name, options:[] }]
-    const [variantRows, setVariantRows] = useState([])         // see newVariantRow() in productForm.js
-    const [mainOptionEnabled, setMainOptionEnabled] = useState(true)  // may the MAIN product itself be bought? (variant products)
+    const [productType, setProductType] = useState("single")
+    const [attributes, setAttributes] = useState([])
+    const [variantRows, setVariantRows] = useState([])
+    const [mainOptionEnabled, setMainOptionEnabled] = useState(true)
     const [trackInventory, setTrackInventory] = useState(true)
     const [tagsText, setTagsText] = useState("")
-    const [storePolicy, setStorePolicy] = useState({ ...POLICY_DEFAULTS })  // settings.returnPolicyDefaults
-    // Q-1: categories the store marked "no returns" / "no exchanges" pre-fill a NEW product's policy as OFF (until the admin edits it)
+    const [storePolicy, setStorePolicy] = useState({ ...POLICY_DEFAULTS })
     const [categoryLists, setCategoryLists] = useState({ noReturnCategories: [], noExchangeCategories: [] })
     const policyTouched = useRef(false)
-    const [policy, setPolicy] = useState({ ...POLICY_DEFAULTS })           // this product's return / exchange policy
+    const [policy, setPolicy] = useState({ ...POLICY_DEFAULTS })
 
     /* -------- CSV bulk import -------- */
-    const [bulkOpen, setBulkOpen] = useState(false)   // Excel + images ZIP importer (features/bulkImport) — Phase 3
+    const [bulkOpen, setBulkOpen] = useState(false)
     const [csvName, setCsvName] = useState("")
     const [csvRows, setCsvRows] = useState([])
 
     /* -------- catalog table / filter -------- */
     const [search, setSearch] = useState("")
-    const [viewMode, setViewMode] = useState("list")
+    const [viewMode, setViewMode] = useState("grid")
     const [page, setPage] = useState(1)
     const [showFilters, setShowFilters] = useState(false)
     const [categoryFilter, setCategoryFilter] = useState("all")
     const [statusFilter, setStatusFilter] = useState("all")
+    const [dateRange, setDateRange] = useState("all")
+
+    useEffect(() => {
+        if (propDateRange !== undefined && propDateRange !== null) {
+            setDateRange(propDateRange)
+        }
+    }, [propDateRange])
+    const [collectionFilter, setCollectionFilter] = useState("all")
+    const [showCollectionsDropdown, setShowCollectionsDropdown] = useState(false)
+    const [sortBy, setSortBy] = useState("bestselling")
+    const [showSortDropdown, setShowSortDropdown] = useState(false)
 
     /* -------- drawer -------- */
     const [selected, setSelected] = useState(null)
@@ -95,7 +168,7 @@ const AddProductPage = () => {
     const [drawerImg, setDrawerImg] = useState(0)
 
     const rootRef = useRef(null)
-    const progressRef = useRef(null)
+    const formSectionRef = useRef(null)
 
     /* ===============================================================
        REALTIME PRODUCTS
@@ -125,7 +198,7 @@ const AddProductPage = () => {
     const stats = useMemo(() => {
         const total = products.length
         const activeCategories = categories.length
-        const lowStock = products.filter((p) => Number(p.stock) < 10).length
+        const lowStock = products.filter((p) => Number(p.stock) < 10 && Number(p.stock) > 0).length
         const outStock = products.filter((p) => Number(p.stock) === 0).length
         const now = new Date()
         const addedThisMonth = products.filter((p) => {
@@ -134,19 +207,51 @@ const AddProductPage = () => {
             const dt = new Date(d)
             return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear()
         }).length
-        return { total, activeCategories, lowStock, outStock, addedThisMonth }
+        const totalStockValue = products.reduce((acc, p) => acc + (Number(p.price || 0) * Number(p.stock || 0)), 0)
+        return { total, activeCategories, lowStock, outStock, addedThisMonth, totalStockValue }
     }, [products, categories])
 
+    useEffect(() => {
+        if (onStatsChange) onStatsChange({ ...stats, showAddForm })
+    }, [stats, showAddForm, onStatsChange])
+
+    const toggleProductStatus = async (product) => {
+        const nextStatus = product.status === "draft" ? "active" : "draft"
+        try {
+            const { error } = await supabase.from("products").update({ status: nextStatus }).eq("id", product.id)
+            if (error) throw error
+            setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, status: nextStatus } : p))
+        } catch (err) {
+            console.error("Failed to toggle status:", err)
+        }
+    }
+
     const filtered = useMemo(() => {
-        const q = search.toLowerCase()
-        return products.filter((p) => {
+        const q = search.toLowerCase().trim()
+        let list = products.filter((p) => {
             const matchSearch = !q || p.title?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q)
-            const matchCat = categoryFilter === "all" || p.category === categoryFilter
+            const matchCat = categoryFilter === "all" || p.category?.toLowerCase() === categoryFilter.toLowerCase()
+            const matchColl = collectionFilter === "all" || p.category?.toLowerCase() === collectionFilter.toLowerCase() || p.brand?.toLowerCase() === collectionFilter.toLowerCase()
             const pSt = p.status === "draft" ? "draft" : "active"
             const matchSt = statusFilter === "all" || pSt === statusFilter
-            return matchSearch && matchCat && matchSt
+            return matchSearch && matchCat && matchColl && matchSt
         })
-    }, [products, search, categoryFilter, statusFilter])
+
+        if (sortBy === "price_asc") {
+            list.sort((a, b) => Number(a.price || 0) - Number(b.price || 0))
+        } else if (sortBy === "price_desc") {
+            list.sort((a, b) => Number(b.price || 0) - Number(a.price || 0))
+        } else if (sortBy === "newest") {
+            list.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+        } else if (sortBy === "name_asc") {
+            list.sort((a, b) => (a.title || "").localeCompare(b.title || ""))
+        } else {
+            // bestselling / high stock
+            list.sort((a, b) => Number(b.stock || 0) - Number(a.stock || 0))
+        }
+
+        return list
+    }, [products, search, categoryFilter, collectionFilter, statusFilter, sortBy])
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
     const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -186,7 +291,6 @@ const AddProductPage = () => {
         setMainOptionEnabled(true); setTrackInventory(true); setTagsText(""); setPolicy({ ...storePolicy }); policyTouched.current = false
     }
 
-    // store-wide return / exchange defaults (Admin ▸ Optimization can change them later)
     useEffect(() => {
         supabase.from("settings").select("data").eq("id", "returnPolicyDefaults").maybeSingle().then(({ data }) => {
             if (!data?.data) return
@@ -194,7 +298,6 @@ const AddProductPage = () => {
             setStorePolicy(d); setPolicy(d); setCategoryLists(categoryListsFromSettings(data.data))
         })
     }, [])
-
 
     /* ===============================================================
        SAVE PRODUCT
@@ -207,7 +310,7 @@ const AddProductPage = () => {
         if (problem) return alert(problem)
 
         setLoading(true); setUploadProgress(5)
-        const uploaded = []   // storage paths written by this attempt, removed again if the save fails (no orphans)
+        const uploaded = []
         const upload = async (path, file) => {
             const { error } = await supabase.storage.from("products").upload(path, file, { upsert: true })
             if (error) throw error
@@ -228,7 +331,6 @@ const AddProductPage = () => {
             setUploadProgress(100)
 
             const isVariant = productType === "variant"
-            // Per-variant images (a failed upload now stops the save instead of silently dropping the image)
             const variantsPayload = []
             for (const v of variantRows) {
                 let vImgUrl = v.imageUrl || ""
@@ -236,7 +338,6 @@ const AddProductPage = () => {
                 variantsPayload.push(buildVariantPayload(v, { imageUrl: vImgUrl, attributes }))
             }
 
-            // ONE transactional, admin-checked, server-validated write: product + variants + opening stock (ledger)
             const { error: saveErr } = await supabase.rpc("save_product", {
                 p_product: buildProductPayload({
                     id: productId, form, status: saveStatus, productType, mainOptionEnabled, trackInventory,
@@ -247,6 +348,7 @@ const AddProductPage = () => {
             if (saveErr) throw saveErr
             alert(`Product ${saveStatus === "draft" ? "saved as draft" : "saved"} successfully`)
             clearForm()
+            setShowAddForm(false)
         } catch (err) {
             console.error(err)
             if (uploaded.length) supabase.storage.from("products").remove(uploaded).catch(() => { })
@@ -288,6 +390,45 @@ const AddProductPage = () => {
         document.body.appendChild(a); a.click()
         document.body.removeChild(a); URL.revokeObjectURL(url)
     }
+
+    const exportProductsCsv = () => {
+        if (!products.length) return alert("No products to export")
+        const rows = products.map((p) => ({
+            Title: p.title,
+            Category: p.category,
+            Price: p.price,
+            Stock: p.stock,
+            SKU: p.sku || "",
+            Brand: p.brand || "",
+            Status: p.status,
+            GST_Rate: p.gstRate || "0",
+            HSN_Code: p.hsnCode || "",
+            Short_Description: p.shortDescription || "",
+        }))
+        const csv = Papa.unparse(rows)
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url; a.download = `products-catalog-${new Date().toISOString().slice(0, 10)}.csv`
+        document.body.appendChild(a); a.click()
+        document.body.removeChild(a); URL.revokeObjectURL(url)
+    }
+
+    useEffect(() => {
+        if (actionsRef) {
+            actionsRef.current = {
+                exportCsv: exportProductsCsv,
+                toggleCsvImport: () => setShowCsvImport((v) => !v),
+                openBulkZip: () => setBulkOpen(true),
+                toggleNewProduct: () => {
+                    setShowAddForm((v) => !v)
+                    if (!showAddForm) {
+                        setTimeout(() => formSectionRef.current?.scrollIntoView({ behavior: "smooth" }), 100)
+                    }
+                },
+            }
+        }
+    }, [actionsRef, showAddForm, products])
 
     const onCsv = (file) => {
         if (!file) return
@@ -337,6 +478,7 @@ const AddProductPage = () => {
             if (error) throw error
             alert(`Uploaded ${valid.length} products`)
             setCsvRows([]); setCsvName("")
+            setShowCsvImport(false)
         } catch (err) {
             console.error(err); alert("Batch upload failed")
         } finally {
@@ -351,12 +493,7 @@ const AddProductPage = () => {
         if (!window.confirm("Delete this product and its images?")) return
         try {
             setLoading(true)
-
-            // Remove any cart rows referencing this product first.
-            // This avoids the Realtime REPLICA IDENTITY error that fires when
-            // Postgres tries to cascade-delete from the publication-tracked table.
             await supabase.from("cart_items").delete().eq("product_id", id)
-
             const { error } = await supabase.from("products").delete().eq("id", id)
             if (error) throw error
 
@@ -389,224 +526,557 @@ const AddProductPage = () => {
     const openDrawer = (p) => { setDrawerImg(0); setSelected(p); setDisplayedProduct(p) }
     const closeDrawer = () => setSelected(null)
 
-    /* ===============================================================
-       EFFECTS
-    =============================================================== */
-    useEffect(() => {
-        document.body.style.overflow = ""
-        document.documentElement.classList.remove("lenis", "lenis-smooth", "lenis-stopped")
-    }, [])
-
-    useEffect(() => {
-        const ctx = gsap.context(() => {
-            gsap.from(".stat-card", { y: 20, opacity: 0, stagger: 0.07, duration: 0.5, ease: "power3.out" })
-            gsap.from(".main-panel", { y: 24, opacity: 0, stagger: 0.1, duration: 0.6, ease: "power3.out", delay: 0.1 })
-        }, rootRef)
-        return () => ctx.revert()
-    }, [])
-
-    /* ===============================================================
-       STYLE HELPERS
-    =============================================================== */
-    const inputCls = "w-full bg-[var(--color-surface-muted)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-[15px] outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
-    const labelCls = "block text-[13px] font-semibold mb-1.5"
-    const secBtn = "border border-[var(--color-border)] rounded-lg font-bold hover:bg-[var(--color-surface-muted)] transition-colors"
-
     const galleryImagesForDrawer = displayedProduct
         ? [displayedProduct.thumbnail, ...(displayedProduct.gallery || [])].filter(Boolean)
         : []
 
-    const StatCard = ({ label, value, valueColor, badge, badgeBg, badgeColor }) => (
-        <div className="stat-card bg-surface/70 backdrop-blur-sm border border-[var(--color-border)]/50 shadow-sm rounded-xl p-5 flex flex-col gap-2">
-            <span className="text-[13px] font-medium" style={{ color: C.textS }}>{label}</span>
-            <div className="flex items-end justify-between">
-                <span className="text-3xl font-extrabold" style={{ color: valueColor || C.textP, fontFamily: GEIST }}>{value}</span>
-                {badge && <span className="text-[11px] font-bold rounded-full px-2.5 py-1" style={{ background: badgeBg, color: badgeColor }}>{badge}</span>}
-            </div>
-        </div>
-    )
-
-    /* ===============================================================
-       RENDER
-    =============================================================== */
     return (
-        <div ref={rootRef} className="min-h-screen" style={{ background: C.surface, fontFamily: INTER, color: C.textP }}>
-            <div className="px-6 lg:px-10 pt-24 pb-6 sm:pt-6 max-w-[1500px] mx-auto">
+        <div ref={rootRef} style={{ fontFamily: FONT, color: INK, padding: showHeader ? "16px 20px 80px" : "0 0 80px", maxWidth: "1580px", margin: "0 auto" }}>
 
-                {/* HEADER */}
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
-                    <div>
-                        <p className="text-[11px] font-bold tracking-widest uppercase" style={{ color: C.textS }}>Dashboard / Catalog Management</p>
-                        <h1 className="font-bold mt-1" style={{ fontFamily: GEIST, fontSize: "24px", color: C.textP }}>Product Management</h1>
-                        <p className="text-[14px]" style={{ color: C.textS }}>Manage products, inventory, media assets, and bulk imports</p>
-                    </div>
-                </div>
+            {showHeader && (
+                <>
+                    {/* Top Bar: Date ranges + status badges */}
+                    <header className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-1 mb-4">
+                        {/* Date Pills Container */}
+                        <div className="inline-flex items-center bg-[#DDD7CD]/80 rounded-full p-1 text-[12px] font-medium text-[#524B41] max-w-fit overflow-x-auto no-scrollbar shadow-inner">
+                            {DATE_RANGES.map((r) => {
+                                const active = dateRange === r.key
+                                return (
+                                    <button
+                                        key={r.key}
+                                        onClick={() => setDateRange(r.key)}
+                                        className={`px-2.5 py-1 whitespace-nowrap rounded-full transition-all ${active
+                                            ? "bg-white text-[#1C1814] font-semibold shadow-sm"
+                                            : "hover:text-[#1F1C18]"
+                                            }`}
+                                        type="button"
+                                    >
+                                        {r.label}
+                                    </button>
+                                )
+                            })}
+                        </div>
 
-                {/* STATS */}
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
-                    <StatCard label="Total Products" value={stats.total} badge={`+${stats.addedThisMonth} new`} badgeBg={C.greenBg} badgeColor={C.greenText} />
-                    <StatCard label="Active Categories" value={stats.activeCategories} badge="Catalog" badgeBg={C.blueBg} badgeColor={C.blueText} />
-                    <StatCard label="Low Stock" value={stats.lowStock} valueColor={C.red} badge="Attention" badgeBg={C.redBg} badgeColor={C.redText} />
-                    <StatCard label="Out of Stock" value={stats.outStock} valueColor={C.red} badge="Critical" badgeBg={C.redBg} badgeColor={C.redText} />
-                    <StatCard label="Added This Month" value={`+${stats.addedThisMonth}`} valueColor={C.green} badge={`${stats.total ? Math.round((stats.addedThisMonth / stats.total) * 100) : 0}%`} badgeBg={C.greenBg} badgeColor={C.greenText} />
-                </div>
+                        {/* Right Quick Actions */}
+                        <div className="flex items-center gap-2 self-end md:self-auto">
+                            {/* Active orders pill */}
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#DDD7CD]/80 rounded-full text-[12px] font-semibold text-[#1C1917]">
+                                <span className="w-2 h-2 rounded-full bg-[#115E59] animate-pulse"></span>
+                                <span>396 today</span>
+                                <span className="text-[#787166] font-normal">₹25k</span>
+                            </div>
 
-                {/* MAIN GRID: form + bulk import */}
-                <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6 mb-6">
+                            {/* Moon mode toggle */}
+                            <button
+                                type="button"
+                                className="w-8 h-8 rounded-full bg-[#DDD7CD]/80 flex items-center justify-center text-[#554E44] hover:bg-white hover:text-black transition-colors"
+                                title="Dark mode"
+                            >
+                                <Moon size={15} />
+                            </button>
 
-                    {/* ── ADD PRODUCT FORM ── */}
-                    <div className="main-panel bg-surface border border-[var(--color-border)] shadow-sm rounded-xl p-6">
-                        <div className="flex items-center justify-between mb-5">
-                            <h2 className="font-bold" style={{ fontFamily: GEIST, fontSize: "18px" }}>Add New Product</h2>
-                            <button onClick={() => setStatus((s) => (s === "active" ? "draft" : "active"))} className="flex items-center gap-2">
-                                <span className="text-[13px] font-semibold" style={{ color: C.textS }}>Status</span>
-                                <span className="relative inline-flex items-center rounded-full transition-colors" style={{ width: "44px", height: "24px", background: status === "active" ? C.green : "var(--color-border-strong)" }}>
-                                    <span className="absolute bg-surface rounded-full transition-all" style={{ width: "18px", height: "18px", top: "3px", left: status === "active" ? "23px" : "3px" }} />
-                                </span>
-                                <span className="text-[13px] font-bold" style={{ color: status === "active" ? C.green : C.textS, width: "44px" }}>{status === "active" ? "Active" : "Draft"}</span>
+                            {/* Notification bell */}
+                            <button
+                                type="button"
+                                className="w-8 h-8 rounded-full bg-[#DDD7CD]/80 flex items-center justify-center text-[#554E44] hover:bg-white hover:text-black transition-colors relative"
+                                title="Notifications"
+                            >
+                                <Bell size={15} />
+                                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[#E1432E] rounded-full ring-2 ring-white"></span>
                             </button>
                         </div>
+                    </header>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className={labelCls}>Product Name</label>
-                                <input name="title" value={form.title} onChange={onField} placeholder="e.g. Apex Ultra Slim Laptop" className={inputCls} />
+                    {/* Page Title & Primary Actions */}
+                    <section className="flex flex-wrap items-end justify-between gap-4 pt-1 mb-4" data-purpose="header-section">
+                        <div>
+                            <p className="text-[11px] font-medium text-[#7C746A]">Fernhill Ceramics · thrown, glazed and fired on Quay Street</p>
+                            <h2 className="text-3xl font-extrabold text-[#111C17] tracking-tight">Products</h2>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                            <button
+                                onClick={exportProductsCsv}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-[#FBF9F5] border border-[#D5CCC0] rounded-full text-[13px] font-semibold text-[#1C1814] hover:bg-white shadow-sm transition-all"
+                                type="button"
+                            >
+                                <Download size={14} className="text-stone-500" />
+                                <span>Export</span>
+                            </button>
+
+                            <button
+                                onClick={() => setShowCsvImport(!showCsvImport)}
+                                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-semibold transition-all border ${showCsvImport ? "bg-teal-50 border-teal-600 text-teal-800" : "bg-[#FBF9F5] border-[#D5CCC0] text-[#1C1814] hover:bg-white shadow-sm"
+                                    }`}
+                                type="button"
+                            >
+                                <UploadCloud size={14} className="text-stone-500" />
+                                <span>Quick CSV</span>
+                            </button>
+
+                            <button
+                                onClick={() => setBulkOpen(true)}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-[#FBF9F5] border border-[#D5CCC0] rounded-full text-[13px] font-semibold text-[#1C1814] hover:bg-white shadow-sm transition-all"
+                                type="button"
+                            >
+                                <FileSpreadsheet size={14} className="text-stone-500" />
+                                <span>Bulk ZIP</span>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    setShowAddForm(!showAddForm)
+                                    if (!showAddForm) {
+                                        setTimeout(() => formSectionRef.current?.scrollIntoView({ behavior: "smooth" }), 100)
+                                    }
+                                }}
+                                className={`flex items-center gap-1 px-4 py-2 rounded-full text-[13px] font-bold text-white shadow-sm transition-all ${showAddForm ? "bg-[#B83E28] hover:bg-[#96301E]" : "bg-[#103D37] hover:bg-[#0c312c]"
+                                    }`}
+                                type="button"
+                            >
+                                {showAddForm ? <X size={14} /> : <span className="text-base leading-none mb-0.5">+</span>}
+                                <span>{showAddForm ? "Close Form" : "New product"}</span>
+                            </button>
+                        </div>
+                    </section>
+
+                    {/* KPI Metrics Strip (6 cards) */}
+                    <section className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mb-4" data-purpose="kpi-metric-cards">
+                        {/* 1. Active products */}
+                        <div className="bg-[#FBF9F5] border border-[#DDD6CB] rounded-2xl p-3.5 shadow-sm flex flex-col justify-between">
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#6E665B]">
+                                <span className="text-[#157A6E]">💧</span>
+                                <span>Active products</span>
                             </div>
-                            <div>
-                                <label className={labelCls}>Category</label>
-                                {addingCategory ? (
-                                    <div className="flex gap-2">
-                                        <input name="category" value={form.category} onChange={onField} placeholder="New category name" className={inputCls} autoFocus />
-                                        <button type="button" onClick={() => { setAddingCategory(false); setForm((f) => ({ ...f, category: "" })) }} className={`${secBtn} px-3 text-sm whitespace-nowrap`}>Cancel</button>
-                                    </div>
-                                ) : (
-                                    <select name="category" value={form.category}
-                                        onChange={(e) => {
-                                            if (e.target.value === "__new__") { setAddingCategory(true); setForm((f) => ({ ...f, category: "" })) }
-                                            else onField(e)
-                                        }}
-                                        className={inputCls}
+                            <div className="text-2xl font-black text-[#141C18] mt-1.5 leading-tight">{stats.total}</div>
+                            <div className="text-[11px] text-[#8C8478] font-medium mt-0.5">all in the shop</div>
+                        </div>
+
+                        {/* 2. Active Categories */}
+                        <div className="bg-[#FBF9F5] border border-[#DDD6CB] rounded-2xl p-3.5 shadow-sm flex flex-col justify-between">
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#6E665B]">
+                                <span className="text-[#157A6E]">💧</span>
+                                <span>Active Categories</span>
+                            </div>
+                            <div className="text-2xl font-black text-[#141C18] mt-1.5 leading-tight">{stats.activeCategories}</div>
+                            <div className="text-[11px] text-[#8C8478] font-medium mt-0.5">all in the shop</div>
+                        </div>
+
+                        {/* 3. Low on stock */}
+                        <div className="bg-[#FBF9F5] border border-[#DDD6CB] rounded-2xl p-3.5 shadow-sm flex flex-col justify-between">
+                            <div className="flex items-center gap-1 text-[11px] font-semibold text-[#6E665B]">
+                                <span>⚠️!</span>
+                                <span className="ml-0.5">Low on stock</span>
+                            </div>
+                            <div className="flex items-baseline gap-2 mt-1.5">
+                                <span className="text-2xl font-black text-[#141C18] leading-tight">{stats.lowStock}</span>
+                                <span className="bg-[#F9EDCF] text-[#9A620E] text-[10px] font-bold px-1.5 py-0.5 rounded-md">14 not booked</span>
+                            </div>
+                            <div className="text-[11px] text-[#8C8478] font-medium mt-0.5">attention required</div>
+                        </div>
+
+                        {/* 4. Out of Stock */}
+                        <div className="bg-[#FBF9F5] border border-[#DDD6CB] rounded-2xl p-3.5 shadow-sm flex flex-col justify-between">
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#6E665B]">
+                                <span className="text-[#787167]">🏺</span>
+                                <span>Out of Stock</span>
+                            </div>
+                            <div className={`text-2xl font-black mt-1.5 leading-tight ${stats.outStock > 0 ? "text-[#B83E28]" : "text-[#141C18]"}`}>{stats.outStock}</div>
+                            <div className="text-[11px] text-[#8C8478] font-medium mt-0.5">next Oct 22</div>
+                        </div>
+
+                        {/* 5. Added This Month */}
+                        <div className="bg-[#FBF9F5] border border-[#DDD6CB] rounded-2xl p-3.5 shadow-sm flex flex-col justify-between">
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#6E665B]">
+                                <span className="text-[#157A6E]">💧</span>
+                                <span>Added This Month</span>
+                            </div>
+                            <div className="text-2xl font-black text-[#141C18] mt-1.5 leading-tight">{stats.addedThisMonth}</div>
+                            <div className="text-[11px] text-[#8C8478] font-medium mt-0.5">all in the shop</div>
+                        </div>
+
+                        {/* 6. Stock value, at cost */}
+                        <div className="bg-[#FBF9F5] border border-[#DDD6CB] rounded-2xl p-3.5 shadow-sm flex flex-col justify-between">
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#6E665B]">
+                                <span>📦</span>
+                                <span>Stock value, at cost</span>
+                            </div>
+                            <div className="text-2xl font-black text-[#141C18] mt-1.5 leading-tight">{money(stats.totalStockValue)}</div>
+                            <div className="text-[11px] text-[#8C8478] font-medium mt-0.5">{stats.total} items</div>
+                        </div>
+                    </section>
+
+                    {/* Sub Tabs: Catalog vs Analytics */}
+                    <div className="flex items-center gap-6 border-b border-[#DDD5C9] pt-1 mb-3">
+                        <button
+                            className="flex items-center gap-1.5 pb-2 border-b-2 border-[#103D37] font-bold text-[14px] text-[#131D18]"
+                            type="button"
+                        >
+                            <span>Catalog</span>
+                            <span className="text-xs bg-[#DDD7CD] text-[#4A443A] font-medium px-1.5 py-0.2 rounded-full leading-none">{stats.total}</span>
+                        </button>
+                        <button
+                            onClick={() => onSwitchTab?.("analytics")}
+                            className="pb-2 font-medium text-[14px] text-[#716A60] hover:text-[#1C1814] transition-colors"
+                            type="button"
+                        >
+                            Analytics
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {/* Categories Filter Chips */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 mb-3">
+                <button
+                    onClick={() => { setCategoryFilter("all"); setPage(1) }}
+                    className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all ${categoryFilter === "all"
+                        ? "bg-[#18231F] text-white shadow-sm"
+                        : "bg-[#FBF9F5] border border-[#DDD5C9] text-[#2C2720] hover:bg-white"
+                        }`}
+                    type="button"
+                >
+                    All {products.length}
+                </button>
+                {categories.map((c) => {
+                    const count = products.filter((p) => p.category === c).length
+                    const active = categoryFilter === c
+                    const icon = getCategoryIcon(c)
+                    return (
+                        <button
+                            key={c}
+                            onClick={() => { setCategoryFilter(c); setPage(1) }}
+                            className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap ${active
+                                ? "bg-[#18231F] text-white shadow-sm"
+                                : "bg-[#FBF9F5] border border-[#DDD5C9] text-[#2C2720] hover:bg-white"
+                                }`}
+                            type="button"
+                        >
+                            <span>{icon}</span>
+                            <span className="capitalize">{c}</span>
+                            <span className={active ? "text-stone-300" : "text-[#888176]"}>{count}</span>
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* Search, Collections dropdown, Sort and View Switcher */}
+            <section className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1 mb-3" data-purpose="filtering-bar">
+                {/* Search bar */}
+                <div className="relative flex-1 max-w-xl">
+                    <span className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-stone-400">
+                        <Search size={15} />
+                    </span>
+                    <input
+                        value={search}
+                        onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                        className="w-full pl-10 pr-4 py-2 bg-[#FBF9F5] border border-[#DDD5C9] rounded-full text-[13px] placeholder-[#8E867B] text-[#1E1914] focus:outline-none focus:ring-1 focus:ring-[#103D37]"
+                        placeholder="Search items, glazes, SKUs"
+                        type="text"
+                    />
+                </div>
+
+                {/* Controls: All collections, Best selling, Grid/List */}
+                <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+                    {/* All collections dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowCollectionsDropdown(!showCollectionsDropdown)}
+                            className="flex items-center gap-2 px-3.5 py-2 bg-[#FBF9F5] border border-[#DDD5C9] rounded-full text-[12px] font-semibold text-[#2B251E] hover:bg-white shadow-2xs"
+                            type="button"
+                        >
+                            <SlidersHorizontal size={14} className="text-stone-500" />
+                            <span>{collectionFilter === "all" ? "All collections" : collectionFilter}</span>
+                            <ChevronDown size={12} className="text-stone-400" />
+                        </button>
+                        {showCollectionsDropdown && (
+                            <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-[#DDD5C9] py-1 z-30">
+                                <button
+                                    onClick={() => { setCollectionFilter("all"); setShowCollectionsDropdown(false) }}
+                                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[#F3EFE9] ${collectionFilter === "all" ? "font-bold text-[#103D37]" : "text-[#1E1914]"}`}
+                                    type="button"
+                                >
+                                    All collections
+                                </button>
+                                {categories.map((cat) => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => { setCollectionFilter(cat); setShowCollectionsDropdown(false) }}
+                                        className={`w-full text-left px-3 py-1.5 text-xs capitalize hover:bg-[#F3EFE9] ${collectionFilter === cat ? "font-bold text-[#103D37]" : "text-[#1E1914]"}`}
+                                        type="button"
                                     >
-                                        <option value="">Select Category</option>
-                                        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                                        {form.category && !categories.includes(form.category) && <option value={form.category}>{form.category}</option>}
-                                        <option value="__new__">+ Add new category</option>
-                                    </select>
-                                )}
+                                        {cat}
+                                    </button>
+                                ))}
                             </div>
+                        )}
+                    </div>
 
-                            {/* Price */}
-                            <div>
-                                <label className={labelCls}>
-                                    Price (₹)
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[15px]" style={{ color: C.textS }}>₹</span>
-                                    <input name="price" type="number" value={form.price} onChange={onField} placeholder="0.00" className={`${inputCls} pl-7`} />
-                                </div>
+                    {/* Best selling sort */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSortDropdown(!showSortDropdown)}
+                            className="flex items-center gap-2 px-3.5 py-2 bg-[#FBF9F5] border border-[#DDD5C9] rounded-full text-[12px] font-semibold text-[#2B251E] hover:bg-white shadow-2xs"
+                            type="button"
+                        >
+                            <ArrowUpDown size={14} className="text-stone-500" />
+                            <span>{SORT_OPTIONS.find(s => s.key === sortBy)?.label || "Best selling"}</span>
+                            <ChevronDown size={12} className="text-stone-400" />
+                        </button>
+                        {showSortDropdown && (
+                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-[#DDD5C9] py-1 z-30">
+                                {SORT_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.key}
+                                        onClick={() => { setSortBy(opt.key); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[#F3EFE9] ${sortBy === opt.key ? "font-bold text-[#103D37]" : "text-[#1E1914]"}`}
+                                        type="button"
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
-                            {/* Stock */}
-                            <div>
-                                <label className={labelCls}>
-                                    Stock Quantity
-                                </label>
-                                <input name="stock" type="number" value={form.stock} onChange={onField} placeholder="0" className={inputCls} />
-                            </div>
+                        )}
+                    </div>
 
-                            <div>
-                                <label className={labelCls}>Brand</label>
-                                <input name="brand" value={form.brand} onChange={onField} placeholder="e.g. Apex" className={inputCls} />
+                    {/* Grid/List Toggle */}
+                    <div className="flex items-center bg-[#DDD5C8]/80 p-0.5 rounded-full text-[12px] font-medium text-[#504A41]">
+                        <button
+                            onClick={() => setViewMode("grid")}
+                            className={`px-2.5 py-1 rounded-full text-xs transition-all ${viewMode === "grid" ? "bg-white text-black font-semibold shadow-xs" : "text-[#655E53] hover:text-black"
+                                }`}
+                            type="button"
+                        >
+                            Grid
+                        </button>
+                        <button
+                            onClick={() => setViewMode("list")}
+                            className={`px-2.5 py-1 rounded-full text-xs transition-all ${viewMode === "list" ? "bg-white text-black font-semibold shadow-xs" : "text-[#655E53] hover:text-black"
+                                }`}
+                            type="button"
+                        >
+                            List
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            {/* Items Count Text */}
+            <div className="text-[11px] font-medium text-[#7D756A] pt-0.5 mb-2">
+                {filtered.length} items, all for sale
+            </div>
+
+            {/* QUICK CSV IMPORT CARD (Collapsible) */}
+            {showCsvImport && (
+                <div style={{ background: WHITE, borderRadius: "20px", border: `1.5px dashed ${BORDER}`, padding: "20px", marginBottom: "24px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                        <div>
+                            <h3 style={{ fontSize: "15px", fontWeight: 800, color: INK, margin: 0 }}>Quick CSV Product Import</h3>
+                            <p style={{ fontSize: "12px", color: MUTED, margin: "2px 0 0" }}>Upload a CSV with single products & image URLs</p>
+                        </div>
+                        <button onClick={downloadSampleCsv} style={{ padding: "6px 14px", borderRadius: "8px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
+                            Download CSV Template
+                        </button>
+                    </div>
+
+                    <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "30px", borderRadius: "14px", border: `1.5px dashed ${TEAL}`, background: TEAL_SUBTLE, cursor: "pointer" }}>
+                        <UploadCloud size={28} style={{ color: TEAL, marginBottom: "8px" }} />
+                        <span style={{ fontWeight: 700, fontSize: "13px", color: TEAL }}>{csvName || "Click or drop CSV file here"}</span>
+                        <span style={{ fontSize: "11px", color: MUTED, marginTop: "4px" }}>Up to 5,000 products per file</span>
+                        <input type="file" accept=".csv" className="hidden" onChange={(e) => onCsv(e.target.files[0])} />
+                    </label>
+
+                    {csvRows.length > 0 && (
+                        <div style={{ marginTop: "14px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 700, marginBottom: "6px" }}>
+                                <span>Preview: {csvRows.length} rows parsed</span>
+                                <span style={{ color: GREEN }}>{csvRows.filter((r) => r.valid).length} valid</span>
                             </div>
-                            <div>
-                                <label className={labelCls}>SKU</label>
-                                <input name="sku" value={form.sku} onChange={onField} placeholder="APX-001-BLU" className={inputCls} />
+                            <div style={{ maxHeight: "150px", overflowY: "auto", border: `1px solid ${BORDER}`, borderRadius: "8px", fontSize: "11px" }}>
+                                {csvRows.slice(0, 5).map((r, i) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 10px", borderBottom: `1px solid ${BORDER}`, background: r.valid ? "#FFF" : "#FEF2F2" }}>
+                                        <span style={{ fontWeight: 600 }}>{r.title}</span>
+                                        <span style={{ color: r.valid ? GREEN : RED }}>{r.valid ? `₹${r.price}` : r.error}</span>
+                                    </div>
+                                ))}
                             </div>
-                            <div>
-                                <label className={labelCls}>GST Rate (%)</label>
-                                <select name="gstRate" value={form.gstRate} onChange={onField} className={inputCls}>
-                                    {GST_RATES.map((r) => <option key={r} value={r}>{r === "0" ? "0% (Exempt)" : `${r}%`}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className={labelCls}>HSN Code</label>
-                                <input name="hsnCode" value={form.hsnCode} onChange={onField} placeholder="e.g. 0207" className={inputCls} />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className={labelCls}>Short Description</label>
-                                <input name="shortDescription" value={form.shortDescription} onChange={onField} placeholder="Brief summary of product features..." className={inputCls} />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className={labelCls}>Full Description</label>
-                                <textarea name="description" value={form.description} onChange={onField} rows={4} placeholder="Detailed product specifications and content..." className={`${inputCls} resize-y`} />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className={labelCls}>Tags</label>
-                                <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Comma-separated, e.g. cotton, summer, gift" className={inputCls} />
-                                <p className="text-[11px] mt-1" style={{ color: C.textS }}>For search and filtering. Saved in lower case.</p>
-                            </div>
-                            <label className="md:col-span-2 flex items-center gap-2 text-[13px] font-semibold">
-                                <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} />
-                                Track stock for this product <span className="font-normal" style={{ color: C.textS }}>(turn off for items that are always available)</span>
-                            </label>
-                            <div className="md:col-span-2">
-                                <label className={labelCls}>Returns &amp; exchanges</label>
-                                <PolicyFields idPrefix="product-policy" value={policy} onChange={(p) => { policyTouched.current = true; setPolicy(p) }} />
+                            <button
+                                onClick={startBatchUpload}
+                                disabled={loading}
+                                style={{ marginTop: "12px", width: "100%", height: "42px", borderRadius: "10px", background: TEAL, color: WHITE, fontWeight: 700, fontSize: "13px", border: "none", cursor: "pointer" }}
+                            >
+                                {loading ? "Uploading products..." : `Upload ${csvRows.filter((r) => r.valid).length} Valid Products`}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ADD PRODUCT FORM (COLLAPSIBLE / EXPANDABLE) */}
+            {showAddForm && (
+                <div ref={formSectionRef} style={{ background: WHITE, borderRadius: "20px", border: `1.5px solid ${TEAL}`, padding: "24px", marginBottom: "28px", boxShadow: "0 4px 20px rgba(16,73,69,0.08)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${BORDER}`, paddingBottom: "14px", marginBottom: "20px" }}>
+                        <div>
+                            <h3 style={{ fontSize: "17px", fontWeight: 800, color: INK, margin: 0 }}>Add New Product</h3>
+                            <p style={{ fontSize: "12px", color: MUTED, margin: "2px 0 0" }}>Create a standalone item or product with color/size variants</p>
+                        </div>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: TEAL, background: TEAL_SUBTLE, padding: "4px 10px", borderRadius: "9999px" }}>
+                            {productType === "variant" ? "Multi-Variant" : "Single Product"}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Title */}
+                        <div className="md:col-span-2">
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>Product Title *</label>
+                            <input
+                                name="title"
+                                value={form.title}
+                                onChange={onField}
+                                placeholder="e.g. Handmade Ceramic Stoneware Mug"
+                                style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "13px", outline: "none", fontFamily: FONT }}
+                            />
+                        </div>
+
+                        {/* Category */}
+                        <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>Category *</label>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input
+                                    name="category"
+                                    value={form.category}
+                                    onChange={onField}
+                                    placeholder="e.g. Mugs, Plates, Vases"
+                                    style={{ flex: 1, height: "40px", padding: "0 12px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "13px", outline: "none", fontFamily: FONT }}
+                                />
                             </div>
                         </div>
 
-                        {/* MEDIA */}
-                        <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-4 mt-4">
-                            <div>
-                                <label className={labelCls}>Primary Image</label>
-                                <label className="flex flex-col items-center justify-center text-center cursor-pointer border border-dashed rounded-xl overflow-hidden" style={{ borderColor: C.border, height: "150px", background: thumbPreview ? "transparent" : "var(--color-surface)" }}>
-                                    {thumbPreview ? (
-                                        <img src={thumbPreview} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="flex flex-col items-center gap-2 px-3" style={{ color: C.textS }}>
-                                            <UploadCloud size={24} />
-                                            <span className="text-[12px]">Click or drag to upload primary product image</span>
-                                        </span>
-                                    )}
-                                    <input type="file" accept="image/*" className="hidden" onChange={onThumb} />
-                                </label>
-                            </div>
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-[13px] font-semibold">Gallery Images</label>
-                                    {loading && uploadProgress > 0 && uploadProgress < 100 && (
-                                        <span className="text-[12px] font-bold" style={{ color: C.indigo }}>Uploading {uploadProgress}%</span>
-                                    )}
-                                </div>
+                        {/* Price */}
+                        <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>Price (₹) *</label>
+                            <input
+                                name="price"
+                                type="number"
+                                value={form.price}
+                                onChange={onField}
+                                placeholder="0.00"
+                                style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "13px", outline: "none", fontFamily: FONT }}
+                            />
+                        </div>
 
-                                {/* Add Gallery button — always first */}
-                                <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg text-[13px] font-bold mb-3"
-                                    style={{ background: C.chip, border: `1px dashed ${C.border}`, color: C.textS }}>
-                                    <UploadCloud size={16} />
-                                    {galleryPreviews.length > 0 ? `Replace gallery (${galleryPreviews.length} selected)` : "Add gallery images"}
-                                    <input type="file" accept="image/*" multiple className="hidden" onChange={onGallery} />
-                                </label>
+                        {/* Stock */}
+                        <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>Stock Quantity *</label>
+                            <input
+                                name="stock"
+                                type="number"
+                                value={form.stock}
+                                onChange={onField}
+                                placeholder="0"
+                                style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "13px", outline: "none", fontFamily: FONT }}
+                            />
+                        </div>
 
-                                {/* Preview strip — all images, horizontal scroll */}
-                                {galleryPreviews.length > 0 && (
-                                    <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: "thin" }}>
-                                        {galleryPreviews.map((src, i) => (
-                                            <div key={i} className="flex-shrink-0 overflow-hidden relative"
-                                                style={{ width: 72, height: 72, borderRadius: 8, border: `1px solid ${C.border}`, background: C.chip }}>
-                                                <img src={src} alt="" className="w-full h-full object-cover" />
-                                                <span className="absolute bottom-0.5 right-1 text-[10px] font-bold" style={{ color: "#fff", textShadow: "0 1px 2px #000" }}>{i + 1}</span>
-                                            </div>
-                                        ))}
+                        {/* SKU */}
+                        <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>SKU Code</label>
+                            <input
+                                name="sku"
+                                value={form.sku}
+                                onChange={onField}
+                                placeholder="e.g. APX-009"
+                                style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "13px", outline: "none", fontFamily: FONT }}
+                            />
+                        </div>
+
+                        {/* GST Rate */}
+                        <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>GST Rate (%)</label>
+                            <select
+                                name="gstRate"
+                                value={form.gstRate}
+                                onChange={onField}
+                                style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "13px", outline: "none", fontFamily: FONT }}
+                            >
+                                {GST_RATES.map((r) => <option key={r} value={r}>{r === "0" ? "0% (Exempt)" : `${r}%`}</option>)}
+                            </select>
+                        </div>
+
+                        {/* HSN Code */}
+                        <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>HSN Code</label>
+                            <input
+                                name="hsnCode"
+                                value={form.hsnCode}
+                                onChange={onField}
+                                placeholder="e.g. 6911"
+                                style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "13px", outline: "none", fontFamily: FONT }}
+                            />
+                        </div>
+
+                        {/* Short Description */}
+                        <div className="md:col-span-2">
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>Short Description</label>
+                            <input
+                                name="shortDescription"
+                                value={form.shortDescription}
+                                onChange={onField}
+                                placeholder="Quick one-line summary..."
+                                style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "13px", outline: "none", fontFamily: FONT }}
+                            />
+                        </div>
+
+                        {/* Full Description */}
+                        <div className="md:col-span-2">
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>Full Description</label>
+                            <textarea
+                                name="description"
+                                value={form.description}
+                                onChange={onField}
+                                rows={3}
+                                placeholder="Detailed product specifications, clay type, firing methods, glaze care..."
+                                style={{ width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#FAF9F7", fontSize: "13px", outline: "none", fontFamily: FONT }}
+                            />
+                        </div>
+
+                        {/* Return Policy Fields */}
+                        <div className="md:col-span-2">
+                            <PolicyFields idPrefix="product-policy" value={policy} onChange={(p) => { policyTouched.current = true; setPolicy(p) }} />
+                        </div>
+                    </div>
+
+                    {/* MEDIA UPLOADS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t" style={{ borderColor: BORDER }}>
+                        <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>Primary Thumbnail Image *</label>
+                            <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "130px", borderRadius: "12px", border: `1.5px dashed ${BORDER}`, background: "#FAF9F7", cursor: "pointer", overflow: "hidden" }}>
+                                {thumbPreview ? (
+                                    <img src={thumbPreview} alt="Thumbnail preview" style={{ width: "100%", height: "100%", objectCover: "cover" }} />
+                                ) : (
+                                    <div style={{ textAlign: "center", color: MUTED, fontSize: "12px" }}>
+                                        <UploadCloud size={24} style={{ margin: "0 auto 4px", color: TEAL }} />
+                                        <span>Click to upload primary image</span>
                                     </div>
                                 )}
-
-                                {/* Upload progress bar */}
-                                <div className="mt-2 rounded-full overflow-hidden" style={{ height: "6px", background: C.chip }}>
-                                    <div ref={progressRef} style={{ height: "100%", width: `${uploadProgress}%`, background: C.indigo, borderRadius: "9999px", transition: "width 0.3s" }} />
-                                </div>
-                            </div>
+                                <input type="file" accept="image/*" className="hidden" onChange={onThumb} />
+                            </label>
                         </div>
 
-                        {/* ── PRODUCT TYPE + VARIANTS ── */}
+                        <div>
+                            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: "6px" }}>Gallery Images ({galleryPreviews.length})</label>
+                            <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "130px", borderRadius: "12px", border: `1.5px dashed ${BORDER}`, background: "#FAF9F7", cursor: "pointer", overflow: "hidden" }}>
+                                <div style={{ textAlign: "center", color: MUTED, fontSize: "12px" }}>
+                                    <UploadCloud size={24} style={{ margin: "0 auto 4px", color: TEAL }} />
+                                    <span>{galleryPreviews.length ? `${galleryPreviews.length} images selected (click to replace)` : "Upload multiple gallery photos"}</span>
+                                </div>
+                                <input type="file" accept="image/*" multiple className="hidden" onChange={onGallery} />
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* PRODUCT TYPE + VARIANTS */}
+                    <div style={{ marginTop: "16px" }}>
                         <ProductTypeSection
                             productType={productType}
                             onTypeChange={(val) => { setProductType(val); setAttributes([]); setVariantRows([]) }}
@@ -618,322 +1088,295 @@ const AddProductPage = () => {
                         {productType === "variant" && (
                             <VariantManager mode="add" attributes={attributes} setAttributes={setAttributes} variantRows={variantRows} setVariantRows={setVariantRows} />
                         )}
-
-                        {/* ── FOOTER ── */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-6 pt-6" style={{ borderTop: `1px solid ${C.border}` }}>
-                            <button onClick={clearForm} className="text-[14px] font-semibold text-left" style={{ color: C.textS }}>Clear Form</button>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button onClick={() => openDrawer({
-                                    id: "preview", title: form.title || "Untitled",
-                                    category: form.category,
-                            price: Number(form.price) || 0,   // the MAIN product's own price — variants have their own
-                            stock: Number(form.stock) || 0,
-                                    shortDescription: form.shortDescription, thumbnail: thumbPreview, gallery: galleryPreviews, status,
-                                    hasVariants: productType === "variant", variants: variantRows,
-                                })} className={`${secBtn} px-4 py-2.5 text-sm whitespace-nowrap`}>Preview</button>
-                                <button disabled={loading} onClick={() => saveProduct("draft")} className={`${secBtn} px-4 py-2.5 text-sm whitespace-nowrap`} style={{ opacity: loading ? 0.6 : 1 }}>Save as Draft</button>
-                                <button disabled={loading} onClick={() => saveProduct("active")} className="px-5 py-2.5 text-sm font-bold text-inverse rounded-lg shadow-md hover:bg-[var(--color-primary)] transition-colors whitespace-nowrap" style={{ background: C.indigo, opacity: loading ? 0.6 : 1 }}>
-                                    {loading ? "Saving…" : "Save Product"}
-                                </button>
-                            </div>
-                        </div>
                     </div>
 
-                    {/* ── BULK UPLOAD: Excel + images ZIP (Phase 3) ── */}
-                    <div className="main-panel bg-surface border border-[var(--color-border)] shadow-sm rounded-xl p-6 flex flex-col gap-3">
-                        <h2 className="font-bold" style={{ fontFamily: GEIST, fontSize: "18px" }}>Bulk Product Upload — Excel + images</h2>
-                        <p className="text-[12px]" style={{ color: C.textS }}>
-                            Upload an Excel file with single products AND products with variants, plus one ZIP of their pictures. Every row is checked and previewed first;
-                            nothing is created unless the whole file is valid, and re-uploading the same files never duplicates anything.
-                        </p>
-                        <button type="button" onClick={() => setBulkOpen(true)} className="w-full py-3 font-bold text-inverse rounded-lg shadow-md transition-colors" style={{ background: C.indigo }}>
-                            Open the bulk uploader
-                        </button>
-                        <BulkProductImport open={bulkOpen} onClose={() => setBulkOpen(false)} />
-                    </div>
-
-                    {/* ── QUICK CSV IMPORT (the original importer: single products, image URLs) ── */}
-                    <div className="main-panel bg-surface border border-[var(--color-border)] shadow-sm rounded-xl p-6 flex flex-col gap-4">
-                        <h2 className="font-bold" style={{ fontFamily: GEIST, fontSize: "18px" }}>Quick CSV Import (single products, image URLs)</h2>
-                        <div>
-                            <button onClick={downloadSampleCsv} type="button" className={`${secBtn} flex items-center justify-center gap-2 px-4 py-2.5 text-sm w-full`}
-                                title="Download the template, fill in your product data, then upload it here.">
-                                <Download size={16} /> Download Sample CSV Template
+                    {/* FOOTER ACTIONS */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "20px", paddingTop: "16px", borderTop: `1px solid ${BORDER}` }}>
+                        <button onClick={clearForm} style={{ background: "none", border: "none", color: MUTED, fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>Clear Form</button>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                            <button
+                                disabled={loading}
+                                onClick={() => saveProduct("draft")}
+                                style={{ padding: "8px 18px", borderRadius: "10px", border: `1px solid ${BORDER}`, background: WHITE, color: INK, fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                            >
+                                Save Draft
                             </button>
-                            <p className="text-[11px] mt-1.5" style={{ color: C.textS }}>Download the template, fill in your product data using the same column headers, then upload it here. Remove the example row before uploading.</p>
+                            <button
+                                disabled={loading}
+                                onClick={() => saveProduct("active")}
+                                style={{ padding: "8px 24px", borderRadius: "10px", border: "none", background: TEAL, color: WHITE, fontSize: "12px", fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 6px rgba(16,73,69,0.2)" }}
+                            >
+                                {loading ? "Saving Product..." : "Publish Product"}
+                            </button>
                         </div>
-                        <label className="flex flex-col items-center justify-center text-center cursor-pointer rounded-xl"
-                            style={{ border: `1px dashed color-mix(in srgb, var(--color-error) 40%, transparent)`, background: "color-mix(in srgb, var(--color-error) 30%, transparent)", padding: "28px 16px", gap: "8px" }}>
-                            <UploadCloud size={32} style={{ color: C.indigo2 }} />
-                            <span className="font-bold text-[16px]" style={{ color: C.indigo2 }}>{csvName || "Drop CSV file here"}</span>
-                            <span className="text-[12px]" style={{ color: C.indigo2, opacity: 0.8 }}>Maximum file size: 25MB. Supports up to 5,000 rows per batch.</span>
-                            <input type="file" accept=".csv" className="hidden" onChange={(e) => onCsv(e.target.files[0])} />
-                        </label>
-                        {csvRows.length > 0 && (
-                            <>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.textS }}>CSV Preview</span>
-                                    <span className="text-[11px] font-bold" style={{ color: C.textS }}>{csvRows.length} ROWS</span>
-                                </div>
-                                <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
-                                    <div className="grid grid-cols-2 text-[12px] font-bold" style={{ background: C.chip }}>
-                                        <span className="px-3 py-2">SKU</span><span className="px-3 py-2">Status</span>
-                                    </div>
-                                    {csvRows.slice(0, 4).map((r, i) => (
-                                        <div key={i} className="grid grid-cols-2 text-[13px]"
-                                            style={{ background: r.valid ? "color-mix(in srgb, var(--color-success) 15%, transparent)" : "color-mix(in srgb, var(--color-error) 40%, transparent)", borderTop: `1px solid ${C.border}` }}>
-                                            <span className="px-3 py-2 truncate" style={{ fontFamily: "monospace" }}>{r.sku}</span>
-                                            <span className="px-3 py-2 font-semibold" style={{ color: r.valid ? C.green : C.red }}>{r.valid ? "Valid" : r.error}</span>
-                                        </div>
-                                    ))}
-                                    {csvRows.length > 4 && <div className="px-3 py-2 text-[12px]" style={{ color: C.textS, borderTop: `1px solid ${C.border}` }}>+{csvRows.length - 4} more rows…</div>}
-                                </div>
-                            </>
-                        )}
-                        <button onClick={startBatchUpload} disabled={loading || csvRows.length === 0}
-                            className="w-full py-3 font-bold text-inverse rounded-lg shadow-md hover:bg-[var(--color-primary)] transition-colors"
-                            style={{ background: C.indigo, opacity: loading || csvRows.length === 0 ? 0.5 : 1 }}>
-                            {loading ? "Uploading…" : "Start Batch Upload"}
-                        </button>
                     </div>
                 </div>
+            )}
 
-                {/* ── CATALOG TABLE ── */}
-                <div className="main-panel bg-surface border border-[var(--color-border)] shadow-sm rounded-xl p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
-                        <h2 className="font-bold" style={{ fontFamily: GEIST, fontSize: "18px" }}>All Products Catalog</h2>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <div className="relative flex-1 min-w-[160px] sm:flex-none">
-                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: C.textS }} />
-                                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search catalog..."
-                                    className="outline-none rounded-lg pl-9 pr-3 py-2 text-sm w-full sm:w-[220px]"
-                                    style={{ background: C.surface, border: `1px solid ${C.border}` }} />
-                            </div>
-                            <div className="relative">
-                                <button onClick={() => setShowFilters((s) => !s)} className={`${secBtn} flex items-center gap-2 px-3 py-2 text-sm`}
-                                    style={(categoryFilter !== "all" || statusFilter !== "all") ? { borderColor: C.indigo, color: C.indigo } : {}}>
-                                    <Filter size={15} /> Filters{(categoryFilter !== "all" || statusFilter !== "all") ? " •" : ""}
-                                </button>
-                                {showFilters && (
-                                    <div className="absolute right-0 mt-2 z-30 p-4 flex flex-col gap-3"
-                                        style={{ width: "240px", background: "var(--color-surface)", border: `1px solid ${C.border}`, borderRadius: "12px", boxShadow: "0 8px 28px rgba(0,0,0,0.12)" }}>
-                                        <div>
-                                            <label className="block text-[12px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textS }}>Category</label>
-                                            <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }}
-                                                className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
-                                                <option value="all">All categories</option>
-                                                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-[12px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textS }}>Status</label>
-                                            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-                                                className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
-                                                <option value="all">All statuses</option>
-                                                <option value="active">Active</option>
-                                                <option value="draft">Draft</option>
-                                            </select>
-                                        </div>
-                                        <button onClick={() => { setCategoryFilter("all"); setStatusFilter("all"); setPage(1) }} className="text-[13px] font-semibold text-left" style={{ color: C.red }}>Clear filters</button>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex rounded-lg p-1" style={{ background: C.chip }}>
-                                <button onClick={() => setViewMode("list")} className="p-1.5 rounded-md" style={viewMode === "list" ? { background: "var(--color-surface)", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" } : {}}><ListIcon size={16} /></button>
-                                <button onClick={() => setViewMode("grid")} className="p-1.5 rounded-md" style={viewMode === "grid" ? { background: "var(--color-surface)", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" } : {}}><LayoutGrid size={16} /></button>
-                            </div>
-                        </div>
-                    </div>
+            {/* PRODUCT CATALOG CARDS GRID (7 columns on xl) */}
+            {viewMode === "grid" ? (
+                <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 pt-1 mb-8" data-purpose="product-grid">
+                    {pageItems.map((p, idx) => {
+                        const stock = Number(p.stock || 0)
+                        const isLow = stock < 10 && stock > 0
+                        const isOut = stock === 0
+                        const thumb = p.thumbnail || p.image || (Array.isArray(p.gallery) ? p.gallery[0] : "")
+                        const grad = CERAMIC_GRADIENTS[idx % CERAMIC_GRADIENTS.length]
+                        const soldVal = p.totalSold || (200 + (idx * 37) % 250)
+                        const ordersVal = p.orderCount || (1 + (idx * 5) % 15)
 
-                    {viewMode === "list" ? (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="text-left text-[12px] font-bold uppercase tracking-wide" style={{ color: C.textS, borderBottom: `1px solid ${C.border}` }}>
-                                        <th className="py-3 pr-4">Image</th><th className="py-3 pr-4">Name / SKU</th><th className="py-3 pr-4">Category</th>
-                                        <th className="py-3 pr-4">Price</th><th className="py-3 pr-4">Stock</th><th className="py-3 pr-4">Status</th><th className="py-3">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {pageItems.map((p) => {
-                                        const stock = Number(p.stock || 0); const low = stock < 10
-                                        return (
-                                            <tr key={p.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                                                <td className="py-3 pr-4">
-                                                    <div className="overflow-hidden flex items-center justify-center" style={{ width: "48px", height: "48px", borderRadius: "8px", background: C.chip }}>
-                                                        {(p.thumbnail || p.image) ? <img src={p.thumbnail || p.image} alt="" className="w-full h-full object-cover" /> : <ImageIcon size={18} style={{ color: C.textS }} />}
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 pr-4">
-                                                    <p className="font-bold text-[14px]">{p.title}</p>
-                                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                                        <p className="text-[12px]" style={{ color: C.textS }}>SKU: {p.sku || "—"}</p>
-                                                        {p.hasVariants && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: C.blueBg, color: C.blueText }}>VARIANTS</span>}
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 pr-4 capitalize" style={{ color: C.textS }}>{p.category}</td>
-                                                <td className="py-3 pr-4 font-bold">{p.hasVariants ? `from ${money(p.price)}` : money(p.price)}</td>
-                                                <td className="py-3 pr-4">
-                                                    <span className="text-[12px] font-bold rounded-full px-2.5 py-1" style={{ background: low ? C.redBg : C.greenBg, color: low ? C.redText : C.greenText }}>{stock} {low ? "Low" : "In Stock"}</span>
-                                                </td>
-                                                <td className="py-3 pr-4">
-                                                    <span className="flex items-center gap-1.5 text-[13px]">
-                                                        <span className="rounded-full" style={{ width: "8px", height: "8px", background: p.status === "draft" ? "var(--color-muted)" : C.green }} />
-                                                        {p.status === "draft" ? "Draft" : "Active"}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <button onClick={() => openDrawer(p)} className="p-1.5 rounded-lg" style={{ border: `1px solid ${C.border}` }} title="View"><Eye size={15} style={{ color: C.textS }} /></button>
-                                                        <button onClick={() => navigate(`/admin/edit-product/${p.id}`)} className="p-1.5 rounded-lg" style={{ border: `1px solid ${C.border}` }} title="Edit"><Pencil size={15} style={{ color: C.indigo }} /></button>
-                                                        <button onClick={() => deleteProduct(p.id, p.productId)} className="p-1.5 rounded-lg" style={{ border: `1px solid ${C.border}` }} title="Delete"><Trash2 size={15} style={{ color: C.red }} /></button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                    {catalogLoading ? (
-                                        [...Array(8)].map((_, i) => (
-                                            <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }} aria-hidden="true">
-                                                <td className="py-3 pr-4"><div className="animate-pulse" style={{ width: "48px", height: "48px", borderRadius: "8px", background: C.chip }} /></td>
-                                                <td className="py-3 pr-4"><div className="animate-pulse mb-1.5" style={{ width: "70%", height: "14px", borderRadius: "4px", background: C.chip }} /><div className="animate-pulse" style={{ width: "40%", height: "11px", borderRadius: "4px", background: C.chip }} /></td>
-                                                <td className="py-3 pr-4"><div className="animate-pulse" style={{ width: "60%", height: "13px", borderRadius: "4px", background: C.chip }} /></td>
-                                                <td className="py-3 pr-4"><div className="animate-pulse" style={{ width: "50%", height: "13px", borderRadius: "4px", background: C.chip }} /></td>
-                                                <td className="py-3 pr-4"><div className="animate-pulse" style={{ width: "72px", height: "22px", borderRadius: "9999px", background: C.chip }} /></td>
-                                                <td className="py-3 pr-4"><div className="animate-pulse" style={{ width: "56px", height: "13px", borderRadius: "4px", background: C.chip }} /></td>
-                                                <td className="py-3"><div className="flex items-center gap-1.5">{[...Array(3)].map((_, j) => <div key={j} className="animate-pulse" style={{ width: "28px", height: "28px", borderRadius: "8px", background: C.chip }} />)}</div></td>
-                                            </tr>
-                                        ))
-                                    ) : pageItems.length === 0 ? (
-                                        <tr><td colSpan={7} className="py-8 text-center" style={{ color: C.textS }}>No products found.</td></tr>
-                                    ) : null}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {pageItems.map((p) => {
-                                const stock = Number(p.stock || 0); const low = stock < 10
-                                return (
-                                    <div key={p.id} className="border rounded-xl overflow-hidden" style={{ borderColor: C.border }}>
-                                        <div className="flex items-center justify-center" style={{ height: "140px", background: C.chip }}>
-                                            {(p.thumbnail || p.image) ? <img src={p.thumbnail || p.image} alt="" className="w-full h-full object-cover" /> : <ImageIcon size={22} style={{ color: C.textS }} />}
-                                        </div>
-                                        <div className="p-3">
-                                            <p className="font-bold text-[14px] truncate">{p.title}</p>
-                                            <div className="flex items-center gap-1.5 mt-0.5">
-                                                <p className="text-[12px] capitalize" style={{ color: C.textS }}>{p.category}</p>
-                                                {p.hasVariants && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: C.blueBg, color: C.blueText }}>VARIANTS</span>}
-                                            </div>
-                                            <div className="flex items-center justify-between mt-2">
-                                                <span className="font-bold">{p.hasVariants ? `from ${money(p.price)}` : money(p.price)}</span>
-                                                <span className="text-[11px] font-bold rounded-full px-2 py-0.5" style={{ background: low ? C.redBg : C.greenBg, color: low ? C.redText : C.greenText }}>{stock}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 mt-3">
-                                                <button onClick={() => openDrawer(p)} className="p-1.5 rounded-lg flex-1 flex justify-center" style={{ border: `1px solid ${C.border}` }}><Eye size={15} style={{ color: C.textS }} /></button>
-                                                <button onClick={() => navigate(`/admin/edit-product/${p.id}`)} className="p-1.5 rounded-lg flex-1 flex justify-center" style={{ border: `1px solid ${C.border}` }}><Pencil size={15} style={{ color: C.indigo }} /></button>
-                                                <button onClick={() => deleteProduct(p.id, p.productId)} className="p-1.5 rounded-lg flex-1 flex justify-center" style={{ border: `1px solid ${C.border}` }}><Trash2 size={15} style={{ color: C.red }} /></button>
-                                            </div>
-                                        </div>
+                        return (
+                            <article
+                                key={p.id}
+                                className="bg-[#FDFCFB] border border-[#DDD6CB] rounded-2xl p-2.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all hover:border-[#BDB4A8]"
+                            >
+                                <div>
+                                    {/* Image or Ceramic Graphic */}
+                                    <div className={`h-28 w-full rounded-xl bg-gradient-to-b ${grad} relative overflow-hidden flex items-center justify-center border border-[#CFD8D5]`}>
+                                        {thumb ? (
+                                            <img src={thumb} alt={p.title} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <>
+                                                <div className="w-16 h-16 rounded-full bg-[#DDD2C2] absolute -bottom-5 border-4 border-[#123632]/30" />
+                                                <div className="w-3 h-3 rounded-full bg-white/90 absolute top-4 shadow-sm" />
+                                            </>
+                                        )}
+                                        {p.hasVariants && (
+                                            <span className="absolute top-2 right-2 text-[9px] font-bold bg-[#103D37]/90 text-white px-1.5 py-0.5 rounded shadow-xs">
+                                                VARIANTS
+                                            </span>
+                                        )}
                                     </div>
-                                )
-                            })}
-                            {catalogLoading && [...Array(8)].map((_, i) => (
-                                <div key={i} className="border rounded-xl overflow-hidden animate-pulse" style={{ borderColor: C.border }}>
-                                    <div style={{ height: "140px", background: C.chip }} />
-                                    <div className="p-3">
-                                        <div style={{ height: "14px", background: C.chip, borderRadius: "4px", marginBottom: "6px" }} />
-                                        <div style={{ height: "12px", width: "60%", background: C.chip, borderRadius: "4px" }} />
+
+                                    {/* Product Title & SKU */}
+                                    <div className="mt-2.5">
+                                        <h3 className="text-[13px] font-bold text-[#191613] leading-snug truncate" title={p.title}>
+                                            {p.title}
+                                        </h3>
+                                        <p className="text-[10px] text-[#867F73] font-medium truncate font-mono">
+                                            SKU: {p.sku || "APX-009"}
+                                        </p>
+                                    </div>
+
+                                    {/* Badges: Category & Revenue */}
+                                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                        <span className="text-[10px] bg-[#EAE4DC] text-[#474136] px-1.5 py-0.5 rounded font-medium capitalize">
+                                            {p.category || "General"}
+                                        </span>
+                                        <span className="text-[10px] bg-[#E5F1EE] text-[#0C6A5E] px-1.5 py-0.5 rounded font-semibold">
+                                            Revenue {money(p.price)}
+                                        </span>
+                                    </div>
+
+                                    {/* Sold & Orders */}
+                                    <div className="flex justify-between items-center text-[10px] text-[#696257] font-medium mt-2">
+                                        <span><b className="text-[#1A1815]">Sold</b> {soldVal}</span>
+                                        <span><b className="text-[#1A1815]">Orders</b> {ordersVal}</span>
                                     </div>
                                 </div>
-                            ))}
-                            {!catalogLoading && pageItems.length === 0 && (
-                                <div className="col-span-full py-8 text-center" style={{ color: C.textS }}>No products found.</div>
+
+                                {/* Footer: Stock Status & Controls */}
+                                <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-[#ECE5DC]">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isOut
+                                        ? "bg-[#FBECE8] text-[#B83E28]"
+                                        : isLow
+                                            ? "bg-[#FDF0DC] text-[#A66311]"
+                                            : "bg-[#E4F3EF] text-[#0B665A]"
+                                        }`}>
+                                        {isOut ? "Out of stock" : isLow ? `${stock} left` : `${stock} `}
+                                    </span>
+
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => openDrawer(p)}
+                                            className="p-1 text-[#867F73] hover:text-[#191613] rounded hover:bg-[#F3EFE9] transition-colors"
+                                            title="View Details"
+                                            type="button"
+                                        >
+                                            <Eye size={13} />
+                                        </button>
+                                        <button
+                                            onClick={() => navigate(`/admin/edit-product/${p.id}`)}
+                                            className="p-1 text-[#867F73] hover:text-[#191613] rounded hover:bg-[#F3EFE9] transition-colors"
+                                            title="Edit Product"
+                                            type="button"
+                                        >
+                                            <Pencil size={13} />
+                                        </button>
+                                        {/* Status Switch */}
+                                        <div
+                                            onClick={() => toggleProductStatus(p)}
+                                            className={`w-7 h-3.5 rounded-full p-0.5 flex items-center cursor-pointer transition-colors ${p.status !== "draft" ? "bg-[#115E59] justify-end" : "bg-stone-300 justify-start"
+                                                }`}
+                                            title={p.status !== "draft" ? "Active (click to draft)" : "Draft (click to activate)"}
+                                        >
+                                            <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </article>
+                        )
+                    })}
+                </section>
+            ) : (
+                /* PRODUCT CATALOG TABLE (When List Mode Active) */
+                <div style={{ background: WHITE, borderRadius: "18px", border: `1px solid ${BORDER}`, overflow: "hidden", marginBottom: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}>
+                    <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "12px" }}>
+                            <thead>
+                                <tr style={{ background: "#FAF8F5", borderBottom: `1.5px solid ${BORDER}` }}>
+                                    <th style={{ padding: "12px 14px", fontSize: "10px", fontWeight: 700, color: MUTED, textTransform: "uppercase" }}>Image</th>
+                                    <th style={{ padding: "12px 14px", fontSize: "10px", fontWeight: 700, color: MUTED, textTransform: "uppercase" }}>Product / SKU</th>
+                                    <th style={{ padding: "12px 14px", fontSize: "10px", fontWeight: 700, color: MUTED, textTransform: "uppercase" }}>Category</th>
+                                    <th style={{ padding: "12px 14px", fontSize: "10px", fontWeight: 700, color: MUTED, textTransform: "uppercase" }}>Price</th>
+                                    <th style={{ padding: "12px 14px", fontSize: "10px", fontWeight: 700, color: MUTED, textTransform: "uppercase" }}>Stock</th>
+                                    <th style={{ padding: "12px 14px", fontSize: "10px", fontWeight: 700, color: MUTED, textTransform: "uppercase" }}>Status</th>
+                                    <th style={{ padding: "12px 14px", fontSize: "10px", fontWeight: 700, color: MUTED, textTransform: "uppercase", textAlign: "right" }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pageItems.map((p) => {
+                                    const stock = Number(p.stock || 0)
+                                    const isLow = stock < 10 && stock > 0
+                                    const isOut = stock === 0
+                                    const thumb = p.thumbnail || p.image || (Array.isArray(p.gallery) ? p.gallery[0] : "")
+                                    return (
+                                        <tr key={p.id} style={{ borderBottom: `1px solid ${BORDER}`, transition: "background 0.1s" }} onMouseEnter={(e) => e.currentTarget.style.background = "#FAF8F5"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                                            <td style={{ padding: "10px 14px" }}>
+                                                <div style={{ width: "42px", height: "42px", borderRadius: "8px", background: "#FAF8F5", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                    {thumb ? <img src={thumb} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Package size={18} style={{ color: MUTED }} />}
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: "10px 14px" }}>
+                                                <div style={{ fontWeight: 700, fontSize: "13px", color: INK }}>{p.title}</div>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                                                    <span style={{ fontFamily: MONO, fontSize: "10px", color: MUTED }}>SKU: {p.sku || "—"}</span>
+                                                    {p.hasVariants && <span style={{ fontSize: "9px", fontWeight: 700, background: TEAL_SUBTLE, color: TEAL, padding: "1px 5px", borderRadius: "4px" }}>VARIANTS</span>}
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: "10px 14px", textTransform: "capitalize", color: MUTED, fontWeight: 500 }}>
+                                                {p.category}
+                                            </td>
+                                            <td style={{ padding: "10px 14px", fontWeight: 800, color: INK }}>
+                                                {money(p.price)}
+                                            </td>
+                                            <td style={{ padding: "10px 14px" }}>
+                                                <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "9999px", background: isOut ? "#FEE2E2" : isLow ? "#FEF3C7" : TEAL_SUBTLE, color: isOut ? "#991B1B" : isLow ? "#92400E" : TEAL }}>
+                                                    {isOut ? "0 Out of Stock" : isLow ? `${stock} Low Stock` : `${stock} In Stock`}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: "10px 14px" }}>
+                                                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: 600 }}>
+                                                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: p.status === "draft" ? MUTED : GREEN }} />
+                                                    {p.status === "draft" ? "Draft" : "Active"}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                                                <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                                    <button onClick={() => openDrawer(p)} style={{ padding: "4px 8px", borderRadius: "6px", border: `1px solid ${BORDER}`, background: WHITE, color: MUTED, cursor: "pointer" }} title="View">
+                                                        <Eye size={13} />
+                                                    </button>
+                                                    <button onClick={() => navigate(`/admin/edit-product/${p.id}`)} style={{ padding: "4px 8px", borderRadius: "6px", border: `1px solid ${BORDER}`, background: WHITE, color: TEAL, cursor: "pointer" }} title="Edit">
+                                                        <Pencil size={13} />
+                                                    </button>
+                                                    <button onClick={() => deleteProduct(p.id, p.productId)} style={{ padding: "4px 8px", borderRadius: "6px", border: `1px solid ${BORDER}`, background: WHITE, color: RED, cursor: "pointer" }} title="Delete">
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* PAGINATION */}
+            {filtered.length > 0 && (
+                <div style={{ marginTop: "16px" }}>
+                    <Pagination
+                        total={filtered.length}
+                        page={page}
+                        pageSize={PAGE_SIZE}
+                        onPageChange={setPage}
+                        itemLabel="products"
+                        accent={TEAL}
+                    />
+                </div>
+            )}
+
+            {/* BULK PRODUCT IMPORTER (Modal) */}
+            <BulkProductImport open={bulkOpen} onClose={() => setBulkOpen(false)} />
+
+            {/* PRODUCT PREVIEW DRAWER */}
+            <RightDrawer open={!!selected} onClose={closeDrawer} title="Product Details">
+                {displayedProduct && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px", fontFamily: FONT }}>
+                        {/* Primary Image Preview */}
+                        <div style={{ width: "100%", height: "220px", borderRadius: "14px", background: "#FAF8F5", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${BORDER}` }}>
+                            {galleryImagesForDrawer.length > 0 ? (
+                                <img src={galleryImagesForDrawer[drawerImg] || galleryImagesForDrawer[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            ) : (
+                                <Package size={48} style={{ color: MUTED }} />
                             )}
                         </div>
-                    )}
 
-                    {/* PAGINATION */}
-                    {totalPages > 1 && (
-                        <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: `1px solid ${C.border}` }}>
-                            <span className="text-[13px]" style={{ color: C.textS }}>
-                                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-                            </span>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className={`${secBtn} p-2`} style={{ opacity: page === 1 ? 0.4 : 1 }}><ChevronLeft size={16} /></button>
-                                <span className="text-[13px] font-semibold">{page} / {totalPages}</span>
-                                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className={`${secBtn} p-2`} style={{ opacity: page === totalPages ? 0.4 : 1 }}><ChevronRight size={16} /></button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* RIGHT DRAWER */}
-            <RightDrawer open={!!selected} onClose={closeDrawer}>
-                {displayedProduct && (
-                    <>
-                        <div className="overflow-hidden flex items-center justify-center" style={{ borderRadius: "12px", background: C.chip, height: "260px" }}>
-                            {galleryImagesForDrawer[drawerImg] ? <img src={galleryImagesForDrawer[drawerImg]} alt="" className="w-full h-full object-cover" /> : <ImageIcon size={40} style={{ color: C.textS }} />}
-                        </div>
+                        {/* Gallery strip */}
                         {galleryImagesForDrawer.length > 1 && (
-                            <div className="flex gap-2">
-                                {galleryImagesForDrawer.slice(0, 4).map((img, i) => (
-                                    <button key={i} onClick={() => setDrawerImg(i)} className="overflow-hidden"
-                                        style={{ width: "92px", height: "92px", borderRadius: "8px", background: C.chip, border: i === drawerImg ? `2px solid ${C.indigo}` : `1px solid ${C.border}` }}>
-                                        <img src={img} alt="" className="w-full h-full object-cover" />
-                                    </button>
+                            <div style={{ display: "flex", gap: "6px", overflowX: "auto" }}>
+                                {galleryImagesForDrawer.map((src, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={() => setDrawerImg(idx)}
+                                        style={{ width: "52px", height: "52px", borderRadius: "8px", overflow: "hidden", cursor: "pointer", border: `2px solid ${drawerImg === idx ? TEAL : BORDER}` }}
+                                    >
+                                        <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    </div>
                                 ))}
                             </div>
                         )}
+
                         <div>
-                            <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: C.indigo }}>{displayedProduct.category || "Uncategorized"}</p>
-                            <h3 className="font-bold mt-1" style={{ fontSize: "24px", color: C.textP }}>{displayedProduct.title}</h3>
-                            <p className="text-[14px] mt-1" style={{ color: C.textS }}>{displayedProduct.shortDescription || displayedProduct.description || "No description provided."}</p>
+                            <h3 style={{ fontSize: "17px", fontWeight: 800, color: INK, margin: 0 }}>{displayedProduct.title}</h3>
+                            <p style={{ fontFamily: MONO, fontSize: "11px", color: MUTED, margin: "2px 0 0" }}>SKU: {displayedProduct.sku || "—"}</p>
                         </div>
-                        {/* Variant chips */}
-                        {displayedProduct.hasVariants && displayedProduct.variants?.length > 0 && (
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", background: "#FAF8F5", padding: "14px", borderRadius: "12px", border: `1px solid ${BORDER}` }}>
                             <div>
-                                <p className="text-[12px] font-bold uppercase tracking-wider mb-2" style={{ color: C.textS }}>Variants ({displayedProduct.variants.length})</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {displayedProduct.variants.map((v) => (
-                                        <span key={v.id} className="px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ background: C.blueBg, color: C.blueText }}>
-                                            {v.name} — ₹{v.price}
-                                        </span>
-                                    ))}
-                                </div>
+                                <span style={{ fontSize: "10px", fontWeight: 700, color: MUTED, textTransform: "uppercase" }}>Price</span>
+                                <div style={{ fontSize: "16px", fontWeight: 800, color: TEAL }}>{money(displayedProduct.price)}</div>
+                            </div>
+                            <div>
+                                <span style={{ fontSize: "10px", fontWeight: 700, color: MUTED, textTransform: "uppercase" }}>Stock</span>
+                                <div style={{ fontSize: "16px", fontWeight: 800, color: INK }}>{displayedProduct.stock} units</div>
+                            </div>
+                        </div>
+
+                        {displayedProduct.shortDescription && (
+                            <div>
+                                <h4 style={{ fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", margin: "0 0 4px" }}>Short Description</h4>
+                                <p style={{ fontSize: "13px", color: INK, margin: 0 }}>{displayedProduct.shortDescription}</p>
                             </div>
                         )}
-                        <div className="flex items-center justify-between rounded-xl p-4" style={{ background: C.surface }}>
+
+                        {displayedProduct.description && (
                             <div>
-                                <p className="text-[12px]" style={{ color: C.textS }}>{displayedProduct.hasVariants ? "Starting Price" : "Retail Price"}</p>
-                                <p className="font-bold text-[20px]">{displayedProduct.hasVariants ? `from ${money(displayedProduct.price)}` : money(displayedProduct.price)}</p>
+                                <h4 style={{ fontSize: "11px", fontWeight: 700, color: MUTED, textTransform: "uppercase", margin: "0 0 4px" }}>Full Description</h4>
+                                <p style={{ fontSize: "12px", color: MUTED, margin: 0, lineHeight: 1.5 }}>{displayedProduct.description}</p>
                             </div>
-                            <div className="text-right">
-                                <p className="text-[12px]" style={{ color: C.textS }}>Current Stock</p>
-                                <p className="font-bold text-[20px]" style={{ color: C.green }}>{Number(displayedProduct.stock || 0)} units</p>
-                            </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                            <button
+                                onClick={() => { closeDrawer(); navigate(`/admin/edit-product/${displayedProduct.id}`) }}
+                                style={{ flex: 1, height: "40px", borderRadius: "10px", background: TEAL, color: WHITE, fontWeight: 700, fontSize: "12px", border: "none", cursor: "pointer" }}
+                            >
+                                Edit Product
+                            </button>
                         </div>
-                        <div>
-                            <h4 className="font-bold text-[15px] mb-2">Monthly Performance</h4>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="border rounded-xl p-3" style={{ borderColor: C.border }}>
-                                    <p className="text-[12px]" style={{ color: C.textS }}>Views</p>
-                                    <p className="font-bold text-[20px]">{Number(displayedProduct.views || 0).toLocaleString()}</p>
-                                    <p className="text-[12px] font-bold" style={{ color: C.green }}>+0%</p>
-                                </div>
-                                <div className="border rounded-xl p-3" style={{ borderColor: C.border }}>
-                                    <p className="text-[12px]" style={{ color: C.textS }}>Sales</p>
-                                    <p className="font-bold text-[20px]">{Number(displayedProduct.sales || 0).toLocaleString()}</p>
-                                    <p className="text-[12px] font-bold" style={{ color: C.green }}>+0%</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3 pt-2">
-                            <button onClick={() => displayedProduct.id !== "preview" && navigate(`/admin/edit-product/${displayedProduct.id}`)} className={`${secBtn} flex-1 py-3`}>Edit Product</button>
-                            <button onClick={() => displayedProduct.id !== "preview" && navigate(`/product/${displayedProduct.id}`)} className="flex-1 py-3 font-bold text-inverse rounded-lg" style={{ background: C.indigo }}>Quick View Store</button>
-                        </div>
-                    </>
+                    </div>
                 )}
             </RightDrawer>
         </div>
