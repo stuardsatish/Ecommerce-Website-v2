@@ -44,6 +44,10 @@ const CustomerHubHeader = ({
   metrics = {},
   activeDateRange = "Today",
   setActiveDateRange,
+  customFrom = "",
+  setCustomFrom,
+  customTo = "",
+  setCustomTo,
   onExport,
   onNewCustomer,
 }) => {
@@ -51,26 +55,53 @@ const CustomerHubHeader = ({
     <div style={{ fontFamily: FONT }} className="w-full flex flex-col space-y-5 text-[#1C1917]" data-purpose="customer-hub-header">
       {/* ── Top Utility Filter Bar ── */}
       <header className="flex items-center justify-between flex-wrap gap-4 pt-1" data-purpose="date-filter-control">
-        {/* Date Range Filter Segmented Control */}
-        <nav className="inline-flex items-center bg-[#E4DDD4] p-1 rounded-xl text-[12px] font-medium text-[#78716C] space-x-0.5">
-          {DATE_RANGES.map((range) => {
-            const isActive = activeDateRange === range
-            return (
-              <button
-                key={range}
-                onClick={() => setActiveDateRange && setActiveDateRange(range)}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                  isActive
-                    ? "bg-white text-[#171412] font-semibold shadow-sm"
-                    : "hover:text-[#171412]"
-                }`}
-                type="button"
-              >
-                {range}
-              </button>
-            )
-          })}
-        </nav>
+        {/* Date Range Filter Segmented Control & Custom Date Pickers */}
+        <div className="flex flex-col gap-2">
+          <nav className="inline-flex items-center bg-[#E4DDD4] p-1 rounded-xl text-[12px] font-medium text-[#78716C] space-x-0.5">
+            {DATE_RANGES.map((range) => {
+              const isActive = activeDateRange === range
+              return (
+                <button
+                  key={range}
+                  onClick={() => setActiveDateRange && setActiveDateRange(range)}
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                    isActive
+                      ? "bg-white text-[#171412] font-semibold shadow-sm"
+                      : "hover:text-[#171412]"
+                  }`}
+                  type="button"
+                >
+                  {range}
+                </button>
+              )
+            })}
+          </nav>
+
+          {/* Custom Date Range Picker */}
+          {activeDateRange === "Custom" && (
+            <div className="inline-flex flex-wrap items-center gap-2 bg-[#F6F3EE] border border-[#DDD6CB] rounded-xl px-3 py-1.5 text-xs text-[#524B41] max-w-fit shadow-xs">
+              <span className="font-bold text-[#1C1814]">From:</span>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom && setCustomFrom(e.target.value)}
+                max={customTo || undefined}
+                className="bg-white border border-[#D5CCC0] rounded-lg px-2.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#0F4C4C]"
+              />
+              <span className="font-bold text-[#1C1814]">To:</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo && setCustomTo(e.target.value)}
+                min={customFrom || undefined}
+                className="bg-white border border-[#D5CCC0] rounded-lg px-2.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#0F4C4C]"
+              />
+              {customFrom && customTo && new Date(customFrom) > new Date(customTo) && (
+                <span className="text-[#B83E28] font-semibold text-[11px]">Start date must be before end date</span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Right Utility Actions (Live counter, theme, alerts) */}
         <div className="flex items-center space-x-3">
@@ -148,8 +179,8 @@ const CustomerHubHeader = ({
             <span>Total Users</span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-[#171412] tracking-tight">{metrics.totalUsers ?? 35}</div>
-            <div className="text-[11px] text-[#78716C] mt-0.5">200% vs prev</div>
+            <div className="text-2xl font-bold text-[#171412] tracking-tight">{metrics.totalUsers ?? 0}</div>
+            <div className="text-[11px] text-[#78716C] mt-0.5">{metrics.usersSubtitle || "200% vs prev"}</div>
           </div>
         </div>
 
@@ -160,8 +191,8 @@ const CustomerHubHeader = ({
             <span>Total Orders</span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-[#171412] tracking-tight">{metrics.totalOrders ?? 108}</div>
-            <div className="text-[11px] text-[#78716C] mt-0.5">300%</div>
+            <div className="text-2xl font-bold text-[#171412] tracking-tight">{metrics.totalOrders ?? 0}</div>
+            <div className="text-[11px] text-[#78716C] mt-0.5">{metrics.ordersSubtitle || "300%"}</div>
           </div>
         </div>
 
@@ -175,9 +206,9 @@ const CustomerHubHeader = ({
             <div className="text-2xl font-bold text-[#171412] tracking-tight truncate">
               {metrics.totalRevenue > 99999
                 ? `₹${(metrics.totalRevenue / 1000).toFixed(0)}k`
-                : formatINR(metrics.totalRevenue ?? 91445)}
+                : formatINR(metrics.totalRevenue ?? 0)}
             </div>
-            <div className="text-[11px] text-[#78716C] mt-0.5">322%</div>
+            <div className="text-[11px] text-[#78716C] mt-0.5">{metrics.revenueSubtitle || "322%"}</div>
           </div>
         </div>
 
@@ -188,8 +219,8 @@ const CustomerHubHeader = ({
             <span>AOV</span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-[#171412] tracking-tight">{formatINR(metrics.aov ?? 847)}</div>
-            <div className="text-[11px] text-[#78716C] mt-0.5">5%</div>
+            <div className="text-2xl font-bold text-[#171412] tracking-tight">{formatINR(metrics.aov ?? 0)}</div>
+            <div className="text-[11px] text-[#78716C] mt-0.5">{metrics.aovSubtitle || "5%"}</div>
           </div>
         </div>
 
@@ -201,11 +232,11 @@ const CustomerHubHeader = ({
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-[#171412] tracking-tight truncate">
-              {metrics.topSpender?.name || "Juniper Home"}
+              {metrics.topSpender?.name || "None in period"}
             </div>
             <div className="mt-1">
               <span className="inline-block bg-[#E0F0EB] text-[#0F4C4C] text-[10.5px] font-semibold px-2 py-0.5 rounded">
-                Spent {formatINR(metrics.topSpender?.totalSpent || 20654)}
+                Spent {formatINR(metrics.topSpender?.periodSpent ?? metrics.topSpender?.totalSpent ?? 0)}
               </span>
             </div>
           </div>
@@ -219,9 +250,11 @@ const CustomerHubHeader = ({
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-[#171412] tracking-tight">
-              {formatINR(metrics.activeUsersCount > 0 ? metrics.activeUsersCount * 732 : 3660)}
+              {metrics.activeUserDisplay || formatINR(metrics.activeUsersSpend ?? (metrics.activeUsersCount > 0 ? metrics.activeUsersCount * 732 : 0))}
             </div>
-            <div className="text-[11px] text-[#78716C] mt-0.5">{metrics.retentionPct ?? 100}% Retention</div>
+            <div className="text-[11px] text-[#78716C] mt-0.5">
+              {metrics.activeUserSubtitle || `${metrics.retentionPct ?? 100}% Retention`}
+            </div>
           </div>
         </div>
       </section>
@@ -241,7 +274,7 @@ const CustomerHubHeader = ({
         >
           <span>Everyone</span>
           <span className="bg-[#DDF0EB] text-[#0F4C4C] text-[11px] font-bold px-2 py-0.5 rounded-full">
-            {metrics.totalUsers ?? 35}
+            {metrics.everyoneTotalUsers ?? metrics.allCustomersCount ?? 35}
           </span>
         </button>
         <button

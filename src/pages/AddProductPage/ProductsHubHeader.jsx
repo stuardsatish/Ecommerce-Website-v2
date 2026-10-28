@@ -54,6 +54,10 @@ const ProductsHubHeader = ({
   onSwitchTab,
   dateRange = "all",
   setDateRange,
+  customFrom = "",
+  setCustomFrom,
+  customTo = "",
+  setCustomTo,
   catalogStats = {},
   analyticsStats = {},
   onExport,
@@ -66,28 +70,55 @@ const ProductsHubHeader = ({
     <div style={{ fontFamily: FONT }} className="w-full flex flex-col text-[#171412] mb-2" data-purpose="products-hub-header">
       {/* ── Top Utility Filter Bar ── */}
       <header className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-1 mb-4">
-        {/* Date Pills Container */}
-        <nav className="inline-flex items-center bg-[#DDD7CD]/80 rounded-full p-1 text-[12px] font-medium text-[#524B41] max-w-fit overflow-x-auto no-scrollbar shadow-inner">
-          {DATE_RANGES.map((r) => {
-            const isActive =
-              dateRange === r.key ||
-              (activeTab === "analytics" && ((r.key === "30d" && dateRange === "month") || (r.key === "all" && dateRange === "")))
-            return (
-              <button
-                key={r.key}
-                onClick={() => setDateRange && setDateRange(r.key)}
-                className={`px-3 py-1 whitespace-nowrap rounded-full transition-all cursor-pointer ${
-                  isActive
-                    ? "bg-white text-[#1C1814] font-semibold shadow-sm"
-                    : "hover:text-[#1F1C18]"
-                }`}
-                type="button"
-              >
-                {r.label}
-              </button>
-            )
-          })}
-        </nav>
+        {/* Date Pills Container & Custom Date Inputs */}
+        <div className="flex flex-col gap-2">
+          <nav className="inline-flex items-center bg-[#DDD7CD]/80 rounded-full p-1 text-[12px] font-medium text-[#524B41] max-w-fit overflow-x-auto no-scrollbar shadow-inner">
+            {DATE_RANGES.map((r) => {
+              const isActive =
+                dateRange === r.key ||
+                (activeTab === "analytics" && ((r.key === "30d" && dateRange === "month") || (r.key === "all" && dateRange === "")))
+              return (
+                <button
+                  key={r.key}
+                  onClick={() => setDateRange && setDateRange(r.key)}
+                  className={`px-3 py-1 whitespace-nowrap rounded-full transition-all cursor-pointer ${
+                    isActive
+                      ? "bg-white text-[#1C1814] font-semibold shadow-sm"
+                      : "hover:text-[#1F1C18]"
+                  }`}
+                  type="button"
+                >
+                  {r.label}
+                </button>
+              )
+            })}
+          </nav>
+
+          {/* Custom Date Range Picker */}
+          {dateRange === "custom" && (
+            <div className="inline-flex flex-wrap items-center gap-2 bg-[#F6F3EE] border border-[#DDD6CB] rounded-xl px-3 py-1.5 text-xs text-[#524B41] max-w-fit shadow-xs">
+              <span className="font-bold text-[#1C1814]">From:</span>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom && setCustomFrom(e.target.value)}
+                max={customTo || undefined}
+                className="bg-white border border-[#D5CCC0] rounded-lg px-2.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#104945]"
+              />
+              <span className="font-bold text-[#1C1814]">To:</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo && setCustomTo(e.target.value)}
+                min={customFrom || undefined}
+                className="bg-white border border-[#D5CCC0] rounded-lg px-2.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-[#104945]"
+              />
+              {customFrom && customTo && new Date(customFrom) > new Date(customTo) && (
+                <span className="text-[#B83E28] font-semibold text-[11px]">Start date must be before end date</span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Right Quick Actions */}
         <div className="flex items-center gap-2 self-end md:self-auto">

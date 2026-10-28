@@ -37,6 +37,7 @@ import {
 
 import { supabase } from "../../context/SupabaseConfig"
 import RightDrawer from "../../components/Common/RightDrawer"
+import { getDateBounds } from "./CustomersHubPage"
 
 /* ============================== DESIGN TOKENS ============================== */
 const FONT = "'Plus Jakarta Sans', sans-serif"
@@ -110,6 +111,39 @@ const formatJoinDate = (dateStr) => {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
 }
 
+const renderSegmentFooter = (list = [], emptyText = "Nobody yet") => {
+  if (!list || list.length === 0) {
+    return (
+      <div className="pt-2 border-t border-[#F2ECE4]">
+        <span className="text-[10px] text-[#8C8479]">{emptyText}</span>
+      </div>
+    )
+  }
+  const top4 = list.slice(0, 4)
+  const first = list[0]
+  const remainder = list.length - 1
+  return (
+    <div className="flex items-center gap-1.5 pt-2 border-t border-[#F2ECE4]">
+      <div className="flex -space-x-1.5 overflow-hidden">
+        {top4.map((c, i) => {
+          const pal = getAvatarPalette(c.name)
+          return (
+            <span
+              key={c.id || i}
+              style={{ backgroundColor: pal.bg, color: pal.text }}
+              className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[8px] font-bold ring-1 ring-white"
+            >
+              {getInitials(c.name)}
+            </span>
+          )
+        })}
+      </div>
+      <span className="text-[10px] text-[#756D63] truncate">
+        {first.name} {remainder > 0 ? `and ${remainder} other${remainder > 1 ? "s" : ""}` : ""}
+      </span>
+    </div>
+  )
+}
 
 const CustomerAnalyticsPage = ({
   onSwitchTab,
@@ -123,8 +157,10 @@ const CustomerAnalyticsPage = ({
   const [orders, setOrders] = useState(sharedData?.orders || [])
   const [loading, setLoading] = useState(!sharedData)
 
-  // Top filters
+  // Top filters & custom dates
   const [activeDateRange, setActiveDateRange] = useState(sharedData?.activeDateRange || "Today")
+  const [customFrom, setCustomFrom] = useState(sharedData?.customFrom || "")
+  const [customTo, setCustomTo] = useState(sharedData?.customTo || "")
   const [channelFilter, setChannelFilter] = useState("all") // all | retail | wholesale | starred
   const [searchQuery, setSearchQuery] = useState("")
   const [visibleCount, setVisibleCount] = useState(20)
@@ -196,6 +232,8 @@ const CustomerAnalyticsPage = ({
     if (sharedData?.profiles) setProfiles(sharedData.profiles)
     if (sharedData?.orders) setOrders(sharedData.orders)
     if (sharedData?.activeDateRange) setActiveDateRange(sharedData.activeDateRange)
+    if (sharedData?.customFrom) setCustomFrom(sharedData.customFrom)
+    if (sharedData?.customTo) setCustomTo(sharedData.customTo)
     if (sharedData?.starredIds) setStarredIds(sharedData.starredIds)
   }, [sharedData])
 
@@ -450,11 +488,16 @@ const CustomerAnalyticsPage = ({
       )
     }
 
-    // Default sort by highest spend for Top Spending Customers
-    list.sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0))
+    // Sort by period spend (or totalSpent if All Time)
+    const isAllTime = metrics.dateBounds ? metrics.dateBounds.isAllTime : (activeDateRange === "All Time")
+    list.sort((a, b) => {
+      const valA = isAllTime ? (a.totalSpent || 0) : (a.periodSpent || 0)
+      const valB = isAllTime ? (b.totalSpent || 0) : (b.periodSpent || 0)
+      return valB - valA
+    })
 
     return list
-  }, [allCustomers, channelFilter, searchQuery])
+  }, [allCustomers, channelFilter, searchQuery, metrics.dateBounds, activeDateRange])
 
   const displayedCustomers = useMemo(() => {
     return filteredCustomers.slice(0, visibleCount)
@@ -467,6 +510,297 @@ const CustomerAnalyticsPage = ({
     const starred = allCustomers.filter((c) => c.isStarred).length
     return { total, retail, wholesale, starred }
   }, [allCustomers])
+
+  /* ── Weekly / Periodic Customer Acquisition Chart Data ── */
+  const acquisitionData = useMemo(() => {
+    const dateBounds = metrics.dateBounds || getDateBounds(activeDateRange, customFrom, customTo)
+    const { startDate, endDate, isAllTime, label } = dateBounds
+    const norm = String(activeDateRange || "").trim().toLowerCase()
+
+    let buckets = []
+    if (norm === "today") {
+      const times = [6, 9, 12, 15, 18, 21]
+      const labels = ["6a", "9a", "12p", "3p", "6p", "9p"]
+      buckets = times.map((h, i) => {
+        const bStart = new Date(startDate)
+        bStart.setHours(h - 3, 0, 0, 0)
+        const bEnd = new Date(startDate)
+        bEnd.setHours(h, 0, 0, 0)
+        const count = allCustomers.filter((c) => {
+          const jd = new Date(c.joinDate || 0)
+          return jd >= bStart && jd < bEnd
+        }).length
+        return { label: labels[i], count }
+      })
+    } else if (norm === "last 7 days" || norm === "7d") {
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000)
+        const bStart = new Date(d)
+        bStart.setHours(0, 0, 0, 0)
+        const bEnd = new Date(d)
+        bEnd.setHours(23, 59, 59, 999)
+        const labelStr = `${d.getMonth() + 1}/${d.getDate()}`
+        const count = allCustomers.filter((c) => {
+          const jd = new Date(c.joinDate || 0)
+          return jd >= bStart && jd <= bEnd
+        }).length
+        buckets.push({ label: labelStr, count })
+      }
+    } else if (norm === "last 30 days" || norm === "30d") {
+      for (let i = 5; i >= 0; i--) {
+        const dEnd = new Date(Date.now() - i * 5 * 86400000)
+        const dStart = new Date(dEnd.getTime() - 5 * 86400000)
+        const labelStr = `${dEnd.getMonth() + 1}/${dEnd.getDate()}`
+        const count = allCustomers.filter((c) => {
+          const jd = new Date(c.joinDate || 0)
+          return jd >= dStart && jd <= dEnd
+        }).length
+        buckets.push({ label: labelStr, count })
+      }
+    } else if (norm === "last 90 days" || norm === "90d") {
+      for (let i = 5; i >= 0; i--) {
+        const dEnd = new Date(Date.now() - i * 15 * 86400000)
+        const dStart = new Date(dEnd.getTime() - 15 * 86400000)
+        const labelStr = `${dEnd.getMonth() + 1}/${dEnd.getDate()}`
+        const count = allCustomers.filter((c) => {
+          const jd = new Date(c.joinDate || 0)
+          return jd >= dStart && jd <= dEnd
+        }).length
+        buckets.push({ label: labelStr, count })
+      }
+    } else if (norm === "last 6 months" || norm === "6m") {
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+      const now = new Date()
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const bStart = new Date(d.getFullYear(), d.getMonth(), 1)
+        const bEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+        const labelStr = monthNames[d.getMonth()]
+        const count = allCustomers.filter((c) => {
+          const jd = new Date(c.joinDate || 0)
+          return jd >= bStart && jd <= bEnd
+        }).length
+        buckets.push({ label: labelStr, count })
+      }
+    } else {
+      // 8 intervals for all time / custom
+      const now = new Date()
+      for (let i = 7; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const bStart = new Date(d.getFullYear(), d.getMonth(), 1)
+        const bEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+        const labelStr = `${d.getMonth() + 1}/${d.getDate()}`
+        const count = allCustomers.filter((c) => {
+          const jd = new Date(c.joinDate || 0)
+          return jd >= bStart && jd <= bEnd
+        }).length
+        buckets.push({ label: labelStr, count })
+      }
+    }
+
+    const maxCount = Math.max(...buckets.map((b) => b.count), 1)
+    const totalNewInPeriod = buckets.reduce((s, b) => s + b.count, 0)
+    const thisWeekCount = allCustomers.filter(
+      (c) => new Date(c.joinDate || 0).getTime() >= Date.now() - 7 * 86400000
+    ).length
+
+    return {
+      buckets,
+      maxCount,
+      totalNewInPeriod,
+      subtitle: `${totalNewInPeriod} new in period · this week: ${thisWeekCount}`,
+    }
+  }, [allCustomers, metrics.dateBounds, activeDateRange, customFrom, customTo])
+
+  /* ── Revenue Trend Chart & Spotlight Data ── */
+  const revenueTrendData = useMemo(() => {
+    const dateBounds = metrics.dateBounds || getDateBounds(activeDateRange, customFrom, customTo)
+    const { startDate, endDate, prevStart, prevEnd, isAllTime, label } = dateBounds
+    const norm = String(activeDateRange || "").trim().toLowerCase()
+
+    // 1. Period orders
+    const periodOrders = orders.filter((o) => {
+      if (isAllTime) return true
+      const d = new Date(o.createdAt || o.created_at || 0)
+      return d >= startDate && d <= endDate
+    })
+
+    const periodRevenue = periodOrders.reduce(
+      (sum, o) => sum + (Number(o.total || o.totalAmount) || 0),
+      0
+    )
+
+    // Previous period revenue
+    const prevOrders = prevStart && prevEnd
+      ? orders.filter((o) => {
+          const d = new Date(o.createdAt || o.created_at || 0)
+          return d >= prevStart && d <= prevEnd
+        })
+      : []
+    const prevRevenue = prevOrders.reduce(
+      (sum, o) => sum + (Number(o.total || o.totalAmount) || 0),
+      0
+    )
+    const growthPct = prevRevenue > 0
+      ? Math.round(((periodRevenue - prevRevenue) / prevRevenue) * 100)
+      : (periodRevenue > 0 ? 100 : 0)
+
+    // Payment methods breakdown in period
+    let onlineRev = 0, studioRev = 0, wholesaleRev = 0
+    for (const o of periodOrders) {
+      const amt = Number(o.total || o.totalAmount) || 0
+      const pay = String(o.paymentMethod || o.payment_method || "").toLowerCase()
+      if (pay.includes("cod") || pay.includes("cash") || pay.includes("delivery")) {
+        wholesaleRev += amt
+      } else if (pay.includes("whatsapp") || pay.includes("manual") || pay.includes("bill") || pay.includes("store")) {
+        studioRev += amt
+      } else {
+        onlineRev += amt // razorpay, online, card, upi
+      }
+    }
+
+    // Top Buyer in this period
+    const topBuyer = allCustomers
+      .filter((c) => (isAllTime ? (c.totalSpent || 0) > 0 : (c.periodSpent || 0) > 0))
+      .sort((a, b) => (isAllTime ? (b.totalSpent || 0) - (a.totalSpent || 0) : (b.periodSpent || 0) - (a.periodSpent || 0)))[0] || null
+
+    // Best Seller product in this period
+    const productSoldMap = {}
+    for (const o of periodOrders) {
+      for (const item of o.products || []) {
+        const pid = item.productId || item.id || item.title
+        if (!pid) continue
+        if (!productSoldMap[pid]) {
+          productSoldMap[pid] = {
+            title: item.title || item.name || "Morning mug",
+            qty: 0,
+            revenue: 0,
+            price: item.price || item.finalPrice || 32,
+          }
+        }
+        productSoldMap[pid].qty += Number(item.quantity) || 1
+        productSoldMap[pid].revenue += (item.lineTotal || ((item.price || 0) * (item.quantity || 1)))
+      }
+    }
+    const bestSeller = Object.values(productSoldMap).sort((a, b) => b.revenue - a.revenue)[0] || {
+      title: "Morning mug",
+      price: 32,
+      qty: 1,
+    }
+
+    // Generate timeline buckets
+    let buckets = []
+    function buildBucket(bLabel, bOrders) {
+      let rz = 0, bill = 0, cod = 0, wa = 0
+      for (const o of bOrders) {
+        const amt = Number(o.total || o.totalAmount) || 0
+        const pay = String(o.paymentMethod || o.payment_method || "").toLowerCase()
+        if (pay.includes("cod") || pay.includes("cash") || pay.includes("delivery")) cod += amt
+        else if (pay.includes("whatsapp") || pay.includes("manual")) wa += amt
+        else if (pay.includes("bill") || pay.includes("store") || pay.includes("pos")) bill += amt
+        else rz += amt
+      }
+      const total = rz + bill + cod + wa
+      return { label: bLabel, total, rz, bill, cod, wa }
+    }
+
+    if (norm === "today") {
+      const times = [0, 3, 6, 9, 12, 15, 18, 21]
+      const labels = ["12a", "3a", "6a", "9a", "12p", "3p", "6p", "9p"]
+      buckets = times.map((h, i) => {
+        const bStart = new Date(startDate)
+        bStart.setHours(h, 0, 0, 0)
+        const bEnd = new Date(startDate)
+        bEnd.setHours(h + 3, 0, 0, 0)
+        const bOrders = orders.filter((o) => {
+          const d = new Date(o.createdAt || o.created_at || 0)
+          return d >= bStart && d < bEnd
+        })
+        return buildBucket(labels[i], bOrders)
+      })
+    } else if (norm === "last 7 days" || norm === "7d") {
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000)
+        const bStart = new Date(d)
+        bStart.setHours(0, 0, 0, 0)
+        const bEnd = new Date(d)
+        bEnd.setHours(23, 59, 59, 999)
+        const labelStr = `${d.getMonth() + 1}/${d.getDate()}`
+        const bOrders = orders.filter((o) => {
+          const od = new Date(o.createdAt || o.created_at || 0)
+          return od >= bStart && od <= bEnd
+        })
+        buckets.push(buildBucket(labelStr, bOrders))
+      }
+    } else if (norm === "last 30 days" || norm === "30d") {
+      for (let i = 5; i >= 0; i--) {
+        const dEnd = new Date(Date.now() - i * 5 * 86400000)
+        const dStart = new Date(dEnd.getTime() - 5 * 86400000)
+        const labelStr = `${dEnd.getMonth() + 1}/${dEnd.getDate()}`
+        const bOrders = orders.filter((o) => {
+          const od = new Date(o.createdAt || o.created_at || 0)
+          return od >= dStart && od <= dEnd
+        })
+        buckets.push(buildBucket(labelStr, bOrders))
+      }
+    } else if (norm === "last 90 days" || norm === "90d") {
+      for (let i = 5; i >= 0; i--) {
+        const dEnd = new Date(Date.now() - i * 15 * 86400000)
+        const dStart = new Date(dEnd.getTime() - 15 * 86400000)
+        const labelStr = `${dEnd.getMonth() + 1}/${dEnd.getDate()}`
+        const bOrders = orders.filter((o) => {
+          const od = new Date(o.createdAt || o.created_at || 0)
+          return od >= dStart && od <= dEnd
+        })
+        buckets.push(buildBucket(labelStr, bOrders))
+      }
+    } else if (norm === "last 6 months" || norm === "6m") {
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+      const now = new Date()
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const bStart = new Date(d.getFullYear(), d.getMonth(), 1)
+        const bEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+        const labelStr = monthNames[d.getMonth()]
+        const bOrders = orders.filter((o) => {
+          const od = new Date(o.createdAt || o.created_at || 0)
+          return od >= bStart && od <= bEnd
+        })
+        buckets.push(buildBucket(labelStr, bOrders))
+      }
+    } else {
+      // 12 monthly bars for All Time
+      const monthNames = ["Nov '25", "Dec", "Jan '26", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"]
+      const now = new Date()
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const bStart = new Date(d.getFullYear(), d.getMonth(), 1)
+        const bEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+        const labelStr = i === 11 ? "Nov '25" : (i === 9 ? "Jan '26" : monthNames[(now.getMonth() - i + 12) % 12])
+        const bOrders = orders.filter((o) => {
+          const od = new Date(o.createdAt || o.created_at || 0)
+          return od >= bStart && od <= bEnd
+        })
+        buckets.push(buildBucket(labelStr, bOrders))
+      }
+    }
+
+    const maxBucketRev = Math.max(...buckets.map((b) => b.total), 1000)
+
+    return {
+      buckets,
+      maxBucketRev,
+      periodRevenue,
+      prevRevenue,
+      growthPct,
+      onlineRev,
+      studioRev,
+      wholesaleRev,
+      topBuyer,
+      bestSeller,
+      periodTitle: isAllTime ? "October 2026" : label,
+    }
+  }, [orders, allCustomers, metrics.dateBounds, activeDateRange, customFrom, customTo])
 
   /* ── Open Customer Details Drawer ── */
   const handleOpenCustomer = useCallback(
@@ -787,32 +1121,28 @@ const CustomerAnalyticsPage = ({
                 <ChevronDown className="w-3 h-3" />
               </button>
             </div>
-            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">Spent ₹60,000 or more, all time</p>
+            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">
+              {metrics.dateBounds?.isAllTime
+                ? "Spent ₹15,000 or more, all time"
+                : `Spent ₹${(metrics.collectorThreshold || 1000).toLocaleString("en-IN")} or more in period`}
+            </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <div>
                 <div className="text-[10px] text-[#867E74]">Members</div>
-                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.collectorsCount}</div>
+                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.collectorsCount ?? 0}</div>
               </div>
               <div>
                 <div className="text-[10px] text-[#867E74]">Revenue share</div>
-                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.collectorsShare}%</div>
+                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.collectorsShare ?? 0}%</div>
               </div>
             </div>
             {/* Progress bar */}
             <div className="w-full bg-[#EAE4DB] h-1 rounded-full overflow-hidden mb-3">
-              <div className="bg-[#0F4C4C] h-full rounded-full" style={{ width: `${metrics.collectorsShare}%` }}></div>
+              <div className="bg-[#0F4C4C] h-full rounded-full" style={{ width: `${metrics.collectorsShare ?? 0}%` }}></div>
             </div>
           </div>
           {/* Avatars Footer */}
-          <div className="flex items-center gap-1.5 pt-2 border-t border-[#F2ECE4]">
-            <div className="flex -space-x-1.5 overflow-hidden">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#FFD7D0] text-[#7A2E22] text-[8px] font-bold ring-1 ring-white">SD</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#D7E9F8] text-[#1D547F] text-[8px] font-bold ring-1 ring-white">IN</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#E0E2EC] text-[#3E4357] text-[8px] font-bold ring-1 ring-white">SC</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#FCE3BA] text-[#7F541D] text-[8px] font-bold ring-1 ring-white">IR</span>
-            </div>
-            <span className="text-[10px] text-[#756D63] truncate">Sofia Duarte and 64 others</span>
-          </div>
+          {renderSegmentFooter(metrics.collectorsList, "Nobody in period")}
         </div>
 
         {/* 2. Regulars */}
@@ -832,32 +1162,26 @@ const CustomerAnalyticsPage = ({
                 <ChevronDown className="w-3 h-3" />
               </button>
             </div>
-            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">Three orders or more</p>
+            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">
+              {metrics.dateBounds?.isAllTime ? "Three orders or more, all time" : "Two or more orders in period"}
+            </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <div>
                 <div className="text-[10px] text-[#867E74]">Members</div>
-                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.regularsCount}</div>
+                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.regularsCount ?? 0}</div>
               </div>
               <div>
                 <div className="text-[10px] text-[#867E74]">Revenue share</div>
-                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.regularsShare}%</div>
+                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.regularsShare ?? 0}%</div>
               </div>
             </div>
             {/* Progress bar */}
             <div className="w-full bg-[#EAE4DB] h-1 rounded-full overflow-hidden mb-3">
-              <div className="bg-[#BC5B3E] h-full rounded-full" style={{ width: `${metrics.regularsShare}%` }}></div>
+              <div className="bg-[#BC5B3E] h-full rounded-full" style={{ width: `${metrics.regularsShare ?? 0}%` }}></div>
             </div>
           </div>
           {/* Avatars Footer */}
-          <div className="flex items-center gap-1.5 pt-2 border-t border-[#F2ECE4]">
-            <div className="flex -space-x-1.5 overflow-hidden">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#FFD7D0] text-[#7A2E22] text-[8px] font-bold ring-1 ring-white">SD</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#D7E9F8] text-[#1D547F] text-[8px] font-bold ring-1 ring-white">IN</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#E0E2EC] text-[#3E4357] text-[8px] font-bold ring-1 ring-white">SC</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#FCE3BA] text-[#7F541D] text-[8px] font-bold ring-1 ring-white">IR</span>
-            </div>
-            <span className="text-[10px] text-[#756D63] truncate">Sofia Duarte and 73 others</span>
-          </div>
+          {renderSegmentFooter(metrics.regularsList, "Nobody in period")}
         </div>
 
         {/* 3. New this month */}
@@ -868,7 +1192,9 @@ const CustomerAnalyticsPage = ({
                 <div className="w-6 h-6 rounded bg-[#EAF2E4] text-[#527C32] flex items-center justify-center">
                   <CalendarDays className="w-3.5 h-3.5" />
                 </div>
-                <span className="font-bold text-[13px] text-[#171412]">New this month</span>
+                <span className="font-bold text-[13px] text-[#171412]">
+                  {activeDateRange === "Today" ? "New today" : (metrics.dateBounds?.isAllTime ? "New this month" : "New in period")}
+                </span>
               </div>
               <button
                 className="w-5 h-5 rounded-full border border-[#E5DFD6] flex items-center justify-center text-[#8C8377] hover:border-[#B5ACA0] cursor-pointer"
@@ -877,30 +1203,28 @@ const CustomerAnalyticsPage = ({
                 <ChevronDown className="w-3 h-3" />
               </button>
             </div>
-            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">Joined in the last 30 days</p>
+            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">
+              {metrics.dateBounds?.isAllTime
+                ? "Joined in the last 30 days"
+                : `Joined in ${metrics.periodLabel?.toLowerCase() || "period"}`}
+            </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <div>
                 <div className="text-[10px] text-[#867E74]">Members</div>
-                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.newMonthCount}</div>
+                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.newMonthCount ?? 0}</div>
               </div>
               <div>
                 <div className="text-[10px] text-[#867E74]">Revenue share</div>
-                <div className="text-[18px] font-extrabold text-[#171412]">5%</div>
+                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.newMonthShare ?? 0}%</div>
               </div>
             </div>
             {/* Progress bar */}
             <div className="w-full bg-[#EAE4DB] h-1 rounded-full overflow-hidden mb-3">
-              <div className="bg-[#527C32] h-full rounded-full" style={{ width: "15%" }}></div>
+              <div className="bg-[#527C32] h-full rounded-full" style={{ width: `${metrics.newMonthShare ?? 0}%` }}></div>
             </div>
           </div>
           {/* Avatars Footer */}
-          <div className="flex items-center gap-1.5 pt-2 border-t border-[#F2ECE4]">
-            <div className="flex -space-x-1.5 overflow-hidden">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#F5EEDB] text-[#796328] text-[8px] font-bold ring-1 ring-white">GH</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#E2ECE3] text-[#345B38] text-[8px] font-bold ring-1 ring-white">ES</span>
-            </div>
-            <span className="text-[10px] text-[#756D63]">{metrics.newMonthCount} people</span>
-          </div>
+          {renderSegmentFooter(metrics.newThisMonthList, "Nobody in period")}
         </div>
 
         {/* 4. Drifting away */}
@@ -920,11 +1244,13 @@ const CustomerAnalyticsPage = ({
                 <ChevronDown className="w-3 h-3" />
               </button>
             </div>
-            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">No order in 60 days</p>
+            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">
+              {metrics.dateBounds?.isAllTime ? "No order in 60 days" : "No orders in this period"}
+            </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <div>
                 <div className="text-[10px] text-[#867E74]">Members</div>
-                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.driftingCount}</div>
+                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.driftingCount ?? 0}</div>
               </div>
               <div>
                 <div className="text-[10px] text-[#867E74]">Revenue share</div>
@@ -937,9 +1263,7 @@ const CustomerAnalyticsPage = ({
             </div>
           </div>
           {/* Avatars Footer */}
-          <div className="pt-2 border-t border-[#F2ECE4]">
-            <span className="text-[10px] text-[#8C8479]">Nobody yet</span>
-          </div>
+          {renderSegmentFooter(metrics.driftingList, "Nobody yet")}
         </div>
 
         {/* 5. Wholesale */}
@@ -959,33 +1283,26 @@ const CustomerAnalyticsPage = ({
                 <ChevronDown className="w-3 h-3" />
               </button>
             </div>
-            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">Orders</p>
+            <p className="text-[10px] text-[#7A7268] leading-tight mb-3">
+              {metrics.dateBounds?.isAllTime ? "All wholesale accounts" : "Wholesale active in period"}
+            </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <div>
                 <div className="text-[10px] text-[#867E74]">Members</div>
-                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.wholesaleCount}</div>
+                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.wholesaleCount ?? 0}</div>
               </div>
               <div>
                 <div className="text-[10px] text-[#867E74]">Revenue share</div>
-                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.wholesaleShare}%</div>
+                <div className="text-[18px] font-extrabold text-[#171412]">{metrics.wholesaleShare ?? 0}%</div>
               </div>
             </div>
             {/* Progress bar */}
             <div className="w-full bg-[#EAE4DB] h-1 rounded-full overflow-hidden mb-3">
-              <div className="bg-[#D99726] h-full rounded-full" style={{ width: `${metrics.wholesaleShare}%` }}></div>
+              <div className="bg-[#D99726] h-full rounded-full" style={{ width: `${metrics.wholesaleShare ?? 0}%` }}></div>
             </div>
           </div>
           {/* Avatars Footer */}
-          <div className="flex items-center gap-1.5 pt-2 border-t border-[#F2ECE4]">
-            <div className="flex -space-x-1.5 overflow-hidden">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#FBEFEA] text-[#BC5B3E] text-[8px] font-bold ring-1 ring-white">JH</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#FCE3BA] text-[#865B16] text-[8px] font-bold ring-1 ring-white">HP</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#FCD8D4] text-[#8C2E20] text-[8px] font-bold ring-1 ring-white">SC</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#E2ECE3] text-[#2F5434] text-[8px] font-bold ring-1 ring-white">KC</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#D7E9F8] text-[#1E527D] text-[8px] font-bold ring-1 ring-white">TG</span>
-            </div>
-            <span className="text-[10px] text-[#756D63] truncate">Juniper Home and 9 others</span>
-          </div>
+          {renderSegmentFooter(metrics.wholesaleList, "Nobody in period")}
         </div>
       </section>
       {/* ── END: Customer Segments Cards Grid ── */}
@@ -1005,14 +1322,16 @@ const CustomerAnalyticsPage = ({
             <div className="relative w-32 h-32 flex-shrink-0 flex items-center justify-center mx-auto">
               <div
                 style={{
-                  background: "conic-gradient(#0F4C4C 0% 65%, #BC5B3E 65% 100%)",
+                  background: `conic-gradient(#0F4C4C 0% ${metrics.retailShare ?? 0}%, #BC5B3E ${metrics.retailShare ?? 0}% 100%)`,
                   borderRadius: "50%",
                 }}
                 className="w-full h-full shadow-inner"
               ></div>
               {/* Inner cutout circle */}
               <div className="absolute w-20 h-20 bg-white rounded-full flex flex-col items-center justify-center shadow-xs">
-                <span className="text-[16px] font-extrabold text-[#171412] leading-none">65%</span>
+                <span className="text-[16px] font-extrabold text-[#171412] leading-none">
+                  {metrics.retailShare ?? 0}%
+                </span>
                 <span className="text-[10px] font-medium text-[#7A7268] mt-0.5">retail</span>
               </div>
             </div>
@@ -1023,20 +1342,24 @@ const CustomerAnalyticsPage = ({
                   <span className="w-2.5 h-2.5 rounded-xs bg-[#0F4C4C] mt-1 flex-shrink-0"></span>
                   <div>
                     <div className="font-bold text-[12px] text-[#171412] leading-tight">Retail</div>
-                    <div className="text-[10px] text-[#7C746A] leading-tight">{metrics.retailCount} people, online and at the studio</div>
+                    <div className="text-[10px] text-[#7C746A] leading-tight">
+                      {metrics.retailCount ?? 0} people, online and at the studio
+                    </div>
                   </div>
                 </div>
-                <div className="font-bold text-[13px] text-[#171412] text-right">{formatINR(metrics.retailRev)}</div>
+                <div className="font-bold text-[13px] text-[#171412] text-right">{formatINR(metrics.retailRev ?? 0)}</div>
               </div>
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-2">
                   <span className="w-2.5 h-2.5 rounded-xs bg-[#BC5B3E] mt-1 flex-shrink-0"></span>
                   <div>
                     <div className="font-bold text-[12px] text-[#171412] leading-tight">Wholesale</div>
-                    <div className="text-[10px] text-[#7C746A] leading-tight">{metrics.wholesaleCount} accounts at trade price</div>
+                    <div className="text-[10px] text-[#7C746A] leading-tight">
+                      {metrics.wholesaleCount ?? 0} accounts at trade price
+                    </div>
                   </div>
                 </div>
-                <div className="font-bold text-[13px] text-[#171412] text-right">{formatINR(metrics.wholesaleRev)}</div>
+                <div className="font-bold text-[13px] text-[#171412] text-right">{formatINR(metrics.wholesaleRev ?? 0)}</div>
               </div>
             </div>
           </div>
@@ -1051,50 +1374,28 @@ const CustomerAnalyticsPage = ({
               </div>
               <h3 className="font-bold text-[13px] text-[#171412]">New customers a week</h3>
             </div>
-            <span className="text-[11px] text-[#7E766D] font-medium">5 since Aug 31 · this week so far: 0</span>
+            <span className="text-[11px] text-[#7E766D] font-medium">{acquisitionData.subtitle}</span>
           </div>
-          {/* Weekly Bar Columns */}
+          {/* Weekly / Periodic Bar Columns */}
           <div className="h-32 flex items-end justify-between gap-3 pt-4 px-2">
-            {/* 8/31 */}
-            <div className="flex-1 flex flex-col items-center h-full justify-end">
-              <div className="w-full bg-[#557C32] rounded-md h-[40%] hover:brightness-110 transition-all"></div>
-              <span className="text-[10px] font-medium text-[#7C746A] mt-2">8/31</span>
-            </div>
-            {/* 9/7 */}
-            <div className="flex-1 flex flex-col items-center h-full justify-end">
-              <div className="w-full bg-[#F5F2EC] rounded-md h-[80%] border border-[#E9E4DC]"></div>
-              <span className="text-[10px] font-medium text-[#7C746A] mt-2">9/7</span>
-            </div>
-            {/* 9/14 */}
-            <div className="flex-1 flex flex-col items-center h-full justify-end">
-              <div className="w-full bg-[#557C32] rounded-md h-[78%] hover:brightness-110 transition-all"></div>
-              <span className="text-[10px] font-medium text-[#7C746A] mt-2">9/14</span>
-            </div>
-            {/* 9/21 */}
-            <div className="flex-1 flex flex-col items-center h-full justify-end">
-              <div className="w-full bg-[#F5F2EC] rounded-md h-[80%] border border-[#E9E4DC]"></div>
-              <span className="text-[10px] font-medium text-[#7C746A] mt-2">9/21</span>
-            </div>
-            {/* 9/28 */}
-            <div className="flex-1 flex flex-col items-center h-full justify-end">
-              <div className="w-full bg-[#F5F2EC] rounded-md h-[80%] border border-[#E9E4DC]"></div>
-              <span className="text-[10px] font-medium text-[#7C746A] mt-2">9/28</span>
-            </div>
-            {/* 10/5 */}
-            <div className="flex-1 flex flex-col items-center h-full justify-end">
-              <div className="w-full bg-[#557C32] rounded-md h-[45%] hover:brightness-110 transition-all"></div>
-              <span className="text-[10px] font-medium text-[#7C746A] mt-2">10/5</span>
-            </div>
-            {/* 10/12 */}
-            <div className="flex-1 flex flex-col items-center h-full justify-end">
-              <div className="w-full bg-[#557C32] rounded-md h-[52%] hover:brightness-110 transition-all"></div>
-              <span className="text-[10px] font-medium text-[#7C746A] mt-2">10/12</span>
-            </div>
-            {/* 10/19 */}
-            <div className="flex-1 flex flex-col items-center h-full justify-end">
-              <div className="w-full bg-[#F5F2EC] rounded-md h-[80%] border border-[#E9E4DC]"></div>
-              <span className="text-[10px] font-medium text-[#7C746A] mt-2">10/19</span>
-            </div>
+            {acquisitionData.buckets.map((b, idx) => {
+              const heightPct = Math.max(12, Math.min(100, Math.round(((b.count || 0) / (acquisitionData.maxCount || 1)) * 100)))
+              const hasCount = b.count > 0
+              return (
+                <div key={b.label + idx} className="flex-1 flex flex-col items-center h-full justify-end">
+                  <div
+                    style={{ height: `${heightPct}%` }}
+                    title={`${b.label}: ${b.count} customers`}
+                    className={`w-full rounded-md transition-all ${
+                      hasCount
+                        ? "bg-[#557C32] hover:brightness-110"
+                        : "bg-[#F5F2EC] border border-[#E9E4DC]"
+                    }`}
+                  ></div>
+                  <span className="text-[10px] font-medium text-[#7C746A] mt-2 whitespace-nowrap">{b.label}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
@@ -1187,8 +1488,13 @@ const CustomerAnalyticsPage = ({
                 displayedCustomers.map((c) => {
                   const palette = getAvatarPalette(c.name)
                   const initials = getInitials(c.name)
-                  const spendPct = Math.min(100, Math.max(8, Math.round(((c.totalSpent || 0) / (metrics.maxSpend || 25000)) * 100)))
-                  const aov = c.ordersCount > 0 ? Math.round(c.totalSpent / c.ordersCount) : 573
+                  const isAllTime = metrics.dateBounds ? metrics.dateBounds.isAllTime : (activeDateRange === "All Time")
+                  const spend = isAllTime ? (c.totalSpent || 0) : (c.periodSpent || 0)
+                  const maxSp = metrics.maxPeriodSpend || 25000
+                  const spendPct = Math.min(100, Math.max(8, Math.round((spend / (maxSp || 1)) * 100)))
+                  const ordersCount = isAllTime ? (c.ordersCount || 0) : (c.periodOrdersCount || 0)
+                  const aov = ordersCount > 0 ? Math.round(spend / ordersCount) : 0
+                  const lastOrder = isAllTime ? c.lastOrder : (c.periodLastOrder || c.lastOrder)
 
                   return (
                     <tr
@@ -1235,13 +1541,13 @@ const CustomerAnalyticsPage = ({
 
                       {/* Orders */}
                       <td className="py-2.5 px-3 text-center font-medium text-[#171412] whitespace-nowrap">
-                        {c.ordersCount}
+                        {ordersCount}
                       </td>
 
                       {/* Total Spend */}
                       <td className="py-2.5 px-3">
                         <div>
-                          <div className="font-bold text-[#171412]">{formatINR(c.totalSpent)}</div>
+                          <div className="font-bold text-[#171412]">{formatINR(spend)}</div>
                           <div className="w-20 bg-[#E6E0D6] h-1 rounded-full overflow-hidden mt-1">
                             <div
                               className="bg-[#0F4C4C] h-full rounded-full transition-all duration-500"
@@ -1253,7 +1559,7 @@ const CustomerAnalyticsPage = ({
 
                       {/* Last Order */}
                       <td className="py-2.5 px-3 text-[#5A534B] whitespace-nowrap">
-                        {formatRelativeTime(c.lastOrder)}
+                        {formatRelativeTime(lastOrder)}
                       </td>
 
                       {/* Action */}
@@ -1340,11 +1646,23 @@ const CustomerAnalyticsPage = ({
             {/* Background Grid lines with Y-Axis Values */}
             <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-7">
               <div className="w-full flex items-center">
-                <span className="text-[10px] text-[#A69F94] w-10">₹150k</span>
+                <span className="text-[10px] text-[#A69F94] w-10">
+                  {revenueTrendData.maxBucketRev >= 100000
+                    ? `₹${Math.round(revenueTrendData.maxBucketRev / 1000)}k`
+                    : revenueTrendData.maxBucketRev >= 1000
+                    ? `₹${(revenueTrendData.maxBucketRev / 1000).toFixed(0)}k`
+                    : `₹${revenueTrendData.maxBucketRev}`}
+                </span>
                 <div className="flex-1 border-b border-dashed border-[#EAE3D8]"></div>
               </div>
               <div className="w-full flex items-center">
-                <span className="text-[10px] text-[#A69F94] w-10">₹75k</span>
+                <span className="text-[10px] text-[#A69F94] w-10">
+                  {revenueTrendData.maxBucketRev >= 100000
+                    ? `₹${Math.round(revenueTrendData.maxBucketRev / 2000)}k`
+                    : revenueTrendData.maxBucketRev >= 1000
+                    ? `₹${(revenueTrendData.maxBucketRev / 2000).toFixed(0)}k`
+                    : `₹${Math.round(revenueTrendData.maxBucketRev / 2)}`}
+                </span>
                 <div className="flex-1 border-b border-dashed border-[#EAE3D8]"></div>
               </div>
               <div className="w-full flex items-center">
@@ -1355,130 +1673,134 @@ const CustomerAnalyticsPage = ({
 
             {/* Stacked Bars Container */}
             <div className="ml-10 flex items-end justify-between gap-2.5 h-64 z-10">
-              {/* Nov '25 */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[35%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[45%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[25%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[30%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2 whitespace-nowrap">Nov '25</span>
-              </div>
-              {/* Dec */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[58%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[55%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[20%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[25%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2">Dec</span>
-              </div>
-              {/* Jan '26 */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[30%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[40%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[25%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[35%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2 whitespace-nowrap">Jan '26</span>
-              </div>
-              {/* Feb */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[38%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[45%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[25%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[30%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2">Feb</span>
-              </div>
-              {/* Mar */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[42%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[45%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[25%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[30%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2">Mar</span>
-              </div>
-              {/* Apr */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[46%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[40%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[30%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[30%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2">Apr</span>
-              </div>
-              {/* May */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[54%] gap-0.5">
-                  <div className="w-full bg-[#FAF5EE] border border-dashed border-[#DAD1C4] h-[30%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[45%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[25%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2">May</span>
-              </div>
-              {/* Jun */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[43%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[45%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[25%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[30%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2">Jun</span>
-              </div>
-              {/* Jul */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[41%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[40%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[30%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[30%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2">Jul</span>
-              </div>
-              {/* Aug */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[42%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[45%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[25%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[30%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2">Aug</span>
-              </div>
-              {/* Sep */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group">
-                <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[45%] gap-0.5">
-                  <div className="w-full bg-[#0F4C4C] h-[45%]"></div>
-                  <div className="w-full bg-[#F3DE97] h-[25%]"></div>
-                  <div className="w-full bg-[#BC5B3E] h-[30%]"></div>
-                </div>
-                <span className="text-[9px] font-semibold text-[#8B8378] mt-2">Sep</span>
-              </div>
-              {/* Oct (Active Focused Bar with Dashed Box and Floating Badge) */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end relative">
-                {/* Floating ₹45k Badge */}
-                <div className="absolute -top-7 -left-3 bg-[#171412] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-md z-20">
-                  ₹45k
-                </div>
-                {/* Dashed Active Outer Box */}
-                <div className="w-full h-[62%] border border-dashed border-[#0F4C4C] rounded-sm p-0.5 flex flex-col justify-end bg-[rgba(15,76,76,0.03)]">
-                  <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-[95%] gap-0.5">
-                    <div className="w-full bg-[#0F4C4C] h-[55%]"></div>
-                    <div className="w-full bg-[#F3DE97] h-[15%]"></div>
-                    <div className="w-full bg-[#BC5B3E] h-[30%]"></div>
+              {revenueTrendData.buckets.map((b, idx) => {
+                const isLast = idx === revenueTrendData.buckets.length - 1
+                const maxVal = revenueTrendData.maxBucketRev || 1
+                const heightPct = b.total > 0
+                  ? Math.max(14, Math.min(100, Math.round((b.total / maxVal) * 100)))
+                  : 8
+
+                // Segment proportions
+                const total = b.total || 1
+                const rzPct = Math.round((b.rz / total) * 100)
+                const billPct = Math.round((b.bill / total) * 100)
+                const codPct = Math.round((b.cod / total) * 100)
+                const waPct = Math.max(0, 100 - rzPct - billPct - codPct)
+
+                const badgeText = b.total >= 1000
+                  ? `₹${Math.round(b.total / 1000)}k`
+                  : `₹${b.total}`
+
+                return (
+                  <div
+                    key={idx}
+                    className="flex-1 flex flex-col items-center h-full justify-end group relative"
+                    title={`${b.label}: ${formatINR(b.total)}`}
+                  >
+                    {/* Floating Badge for last/active bucket if has revenue */}
+                    {isLast && b.total > 0 && (
+                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-[#171412] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-md z-20 whitespace-nowrap">
+                        {badgeText}
+                      </div>
+                    )}
+
+                    {isLast ? (
+                      /* Active Outer Box */
+                      <div
+                        style={{ height: `${heightPct}%` }}
+                        className="w-full border border-dashed border-[#0F4C4C] rounded-sm p-0.5 flex flex-col justify-end bg-[rgba(15,76,76,0.03)] transition-all duration-300"
+                      >
+                        {b.total > 0 ? (
+                          <div className="w-full flex flex-col rounded-t-xs overflow-hidden h-full gap-0.5">
+                            {rzPct > 0 && (
+                              <div
+                                style={{ height: `${rzPct}%` }}
+                                className="w-full bg-[#0F4C4C] transition-all"
+                              />
+                            )}
+                            {billPct > 0 && (
+                              <div
+                                style={{ height: `${billPct}%` }}
+                                className="w-full bg-[#5BA4A4] transition-all"
+                              />
+                            )}
+                            {codPct > 0 && (
+                              <div
+                                style={{ height: `${codPct}%` }}
+                                className="w-full bg-[#D97706] transition-all"
+                              />
+                            )}
+                            {waPct > 0 && (
+                              <div
+                                style={{ height: `${waPct}%` }}
+                                className="w-full bg-[#BE413B] transition-all"
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <div className="w-full h-full bg-[#FAF5EE] border border-dashed border-[#DAD1C4] rounded-t-xs" />
+                        )}
+                      </div>
+                    ) : (
+                      /* Regular Bar */
+                      <div
+                        style={{ height: `${heightPct}%` }}
+                        className="w-full flex flex-col rounded-t-xs overflow-hidden gap-0.5 transition-all duration-300 group-hover:opacity-90"
+                      >
+                        {b.total > 0 ? (
+                          <>
+                            {rzPct > 0 && (
+                              <div
+                                style={{ height: `${rzPct}%` }}
+                                className="w-full bg-[#0F4C4C] transition-all"
+                              />
+                            )}
+                            {billPct > 0 && (
+                              <div
+                                style={{ height: `${billPct}%` }}
+                                className="w-full bg-[#5BA4A4] transition-all"
+                              />
+                            )}
+                            {codPct > 0 && (
+                              <div
+                                style={{ height: `${codPct}%` }}
+                                className="w-full bg-[#D97706] transition-all"
+                              />
+                            )}
+                            {waPct > 0 && (
+                              <div
+                                style={{ height: `${waPct}%` }}
+                                className="w-full bg-[#BE413B] transition-all"
+                              />
+                            )}
+                          </>
+                        ) : (
+                          <div className="w-full h-full bg-[#FAF5EE] border border-dashed border-[#DAD1C4] rounded-t-xs" />
+                        )}
+                      </div>
+                    )}
+
+                    <span
+                      className={`text-[9px] mt-2 whitespace-nowrap ${
+                        isLast ? "font-bold text-[#171412]" : "font-semibold text-[#8B8378]"
+                      }`}
+                    >
+                      {b.label}
+                    </span>
                   </div>
-                </div>
-                <span className="text-[10px] font-bold text-[#171412] mt-2">Oct</span>
-              </div>
+                )
+              })}
             </div>
           </div>
 
-          {/* Right Spotlight Panel: October 2026 Summary (4 Cols) */}
+          {/* Right Spotlight Panel: Period Summary (4 Cols) */}
           <div className="col-span-12 lg:col-span-4 bg-[#FBF9F6] border border-[#E9E3D8] rounded-xl p-4 space-y-4">
-            {/* Month Header */}
+            {/* Header */}
             <div>
               <div className="flex items-center justify-between mb-0.5">
-                <h4 className="font-bold text-[13px] text-[#171412]">October 2026</h4>
+                <h4 className="font-bold text-[13px] text-[#171412]">
+                  {revenueTrendData.periodTitle}
+                </h4>
                 <span className="text-[10px] font-bold bg-[#E1EFE7] text-[#146C43] px-2 py-0.5 rounded-full flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#146C43]"></span>
                   so far
@@ -1487,13 +1809,20 @@ const CustomerAnalyticsPage = ({
               <div className="text-[11px] text-[#7C746A]">All categories</div>
             </div>
 
-            {/* Total October Revenue */}
+            {/* Total Period Revenue */}
             <div>
               <div className="text-[30px] font-extrabold tracking-tight text-[#171412] leading-none mb-1">
-                ₹59,343
+                {formatINR(revenueTrendData.periodRevenue)}
               </div>
-              <span className="inline-block text-[10px] font-bold text-[#116840] bg-[#DCF2E5] px-2 py-0.5 rounded">
-                ↑ +66% vs Oct 1–20 '25
+              <span
+                className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
+                  revenueTrendData.growthPct >= 0
+                    ? "text-[#116840] bg-[#DCF2E5]"
+                    : "text-[#BE413B] bg-[#FCEAE8]"
+                }`}
+              >
+                {revenueTrendData.growthPct >= 0 ? "↑ +" : "↓ "}
+                {revenueTrendData.growthPct}% vs prev period
               </span>
             </div>
 
@@ -1504,48 +1833,80 @@ const CustomerAnalyticsPage = ({
                   <span className="w-2 h-2 rounded-xs bg-[#0F4C4C]"></span>
                   <span className="text-[#595249] font-medium">Online shop</span>
                 </div>
-                <span className="font-bold text-[#171412]">₹43,375</span>
+                <span className="font-bold text-[#171412]">
+                  {formatINR(revenueTrendData.onlineRev)}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-xs bg-[#D99726]"></span>
+                  <span className="w-2 h-2 rounded-xs bg-[#5BA4A4]"></span>
                   <span className="text-[#595249] font-medium">Studio shop</span>
                 </div>
-                <span className="font-bold text-[#171412]">₹3,902</span>
+                <span className="font-bold text-[#171412]">
+                  {formatINR(revenueTrendData.studioRev)}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-xs bg-[#BC5B3E]"></span>
-                  <span className="text-[#595249] font-medium">Wholesale</span>
+                  <span className="w-2 h-2 rounded-xs bg-[#D97706]"></span>
+                  <span className="text-[#595249] font-medium">Wholesale / COD</span>
                 </div>
-                <span className="font-bold text-[#171412]">₹12,066</span>
+                <span className="font-bold text-[#171412]">
+                  {formatINR(revenueTrendData.wholesaleRev)}
+                </span>
               </div>
             </div>
 
             {/* Top Buyer Card */}
             <div className="pt-2 border-t border-[#ECE5DB]">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-[#8A8277] mb-1.5">Top Buyer</div>
-              <div className="bg-white border border-[#E8E1D6] rounded-lg p-2.5 flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-[#E5EFE9] text-[#0F4C4C] font-bold text-[10px] flex items-center justify-center flex-shrink-0">
-                  AN
-                </div>
-                <div>
-                  <div className="font-bold text-[12px] text-[#171412] leading-tight">Atelier Nord</div>
-                  <div className="text-[10px] text-[#7C746A] leading-tight">₹1,180 in the month</div>
-                </div>
+              <div className="text-[9px] font-bold uppercase tracking-wider text-[#8A8277] mb-1.5">
+                Top Buyer
               </div>
+              {revenueTrendData.topBuyer ? (
+                <div className="bg-white border border-[#E8E1D6] rounded-lg p-2.5 flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-[#E5EFE9] text-[#0F4C4C] font-bold text-[10px] flex items-center justify-center flex-shrink-0">
+                    {getInitials(revenueTrendData.topBuyer.name)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-[12px] text-[#171412] leading-tight truncate">
+                      {revenueTrendData.topBuyer.name}
+                    </div>
+                    <div className="text-[10px] text-[#7C746A] leading-tight truncate">
+                      {formatINR(
+                        metrics.dateBounds?.isAllTime
+                          ? revenueTrendData.topBuyer.totalSpent
+                          : revenueTrendData.topBuyer.periodSpent || revenueTrendData.topBuyer.totalSpent
+                      )}{" "}
+                      in period
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11px] text-[#7C746A] italic py-1">
+                  No orders in this period
+                </div>
+              )}
             </div>
 
             {/* Best Seller Card */}
             <div className="pt-1">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-[#8A8277] mb-1.5">Best Seller</div>
+              <div className="text-[9px] font-bold uppercase tracking-wider text-[#8A8277] mb-1.5">
+                Best Seller
+              </div>
               <div className="bg-white border border-[#E8E1D6] rounded-lg p-2.5 flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-full bg-[#D06F41] flex items-center justify-center flex-shrink-0">
                   <div className="w-3.5 h-3.5 rounded-full bg-[#FAF7F2]"></div>
                 </div>
-                <div>
-                  <div className="font-bold text-[12px] text-[#171412] leading-tight">Morning mug</div>
-                  <div className="text-[10px] text-[#7C746A] leading-tight">Oat glaze · ₹32</div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-[12px] text-[#171412] leading-tight truncate">
+                    {revenueTrendData.bestSeller?.title || "Morning mug"}
+                  </div>
+                  <div className="text-[10px] text-[#7C746A] leading-tight truncate">
+                    {revenueTrendData.bestSeller?.qty
+                      ? `Sold ${revenueTrendData.bestSeller.qty} units · `
+                      : ""}
+                    {formatINR(revenueTrendData.bestSeller?.price || 32)}
+                  </div>
                 </div>
               </div>
             </div>

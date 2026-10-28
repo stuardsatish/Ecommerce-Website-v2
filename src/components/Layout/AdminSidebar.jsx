@@ -91,14 +91,31 @@ function NavItem({ icon, label, to, badge, exact = false }) {
 }
 
 /* ─── Collapsible group ─── */
-function NavGroup({ icon, label, children, isOpen, onToggle, matchPaths = [] }) {
+function NavGroup({ icon, label, children, isOpen, onToggle, matchPaths = [], defaultTo }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const anyActive = matchPaths.some(p => location.pathname.startsWith(p))
+
+  const handleRowClick = () => {
+    if (defaultTo) {
+      navigate(defaultTo)
+      if (!isOpen && onToggle) {
+        onToggle(true)
+      }
+    } else if (onToggle) {
+      onToggle()
+    }
+  }
+
+  const handleChevronClick = (e) => {
+    e.stopPropagation()
+    if (onToggle) onToggle()
+  }
 
   return (
     <div>
-      <button
-        onClick={onToggle}
+      <div
+        onClick={handleRowClick}
         style={{
           ...linkBase,
           width: "100%", border: "none", background: anyActive ? TEAL_BG : "transparent",
@@ -106,11 +123,19 @@ function NavGroup({ icon, label, children, isOpen, onToggle, matchPaths = [] }) 
         }}
         onMouseEnter={e => { if (!anyActive) { e.currentTarget.style.background = "#F5F2EE"; e.currentTarget.style.color = INK } }}
         onMouseLeave={e => { if (!anyActive) { e.currentTarget.style.background = anyActive ? TEAL_BG : "transparent"; e.currentTarget.style.color = anyActive ? TEAL : MUTED } }}
+        role="button"
+        tabIndex={0}
       >
         <Icon d={ICONS[icon]} />
         <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
-        <Icon d={isOpen ? ICONS.chevDown : ICONS.chevRight} className="w-3 h-3" />
-      </button>
+        <span
+          onClick={handleChevronClick}
+          style={{ display: "inline-flex", alignItems: "center", padding: "2px 4px", cursor: "pointer" }}
+          title={isOpen ? "Collapse" : "Expand"}
+        >
+          <Icon d={isOpen ? ICONS.chevDown : ICONS.chevRight} className="w-3 h-3" />
+        </span>
+      </div>
       {isOpen && (
         <div style={{ marginTop: "2px", display: "flex", flexDirection: "column", gap: "1px" }}>
           {children}
@@ -237,8 +262,9 @@ const AdminSidebar = () => {
           {/* Orders collapsible */}
           <NavGroup
             icon="orders" label="Orders"
-            isOpen={ordersOpen} onToggle={() => setOrdersOpen(v => !v)}
+            isOpen={ordersOpen} onToggle={(force) => setOrdersOpen(v => typeof force === 'boolean' ? force : !v)}
             matchPaths={["/admin/myorders", "/admin/returns"]}
+            defaultTo="/admin/myorders?view=pack"
           >
             <SubNavItem label="To Pack & Ship" to="/admin/myorders?view=pack" dot />
             <SubNavItem label="All Orders" to="/admin/myorders?view=all" dot />
@@ -248,8 +274,9 @@ const AdminSidebar = () => {
           {/* Products collapsible */}
           <NavGroup
             icon="products" label="Products"
-            isOpen={productsOpen} onToggle={() => setProductsOpen(v => !v)}
+            isOpen={productsOpen} onToggle={(force) => setProductsOpen(v => typeof force === 'boolean' ? force : !v)}
             matchPaths={["/admin/add-product", "/admin/edit-product"]}
+            defaultTo="/admin/add-product?view=catalog"
           >
             <SubNavItem label="Catalog" to="/admin/add-product?view=catalog" dot />
             <SubNavItem label="Analytics" to="/admin/add-product?view=analytics" dot />
@@ -258,8 +285,9 @@ const AdminSidebar = () => {
           {/* Customers collapsible */}
           <NavGroup
             icon="customers" label="Customers"
-            isOpen={customersOpen} onToggle={() => setCustomersOpen(v => !v)}
+            isOpen={customersOpen} onToggle={(force) => setCustomersOpen(v => typeof force === 'boolean' ? force : !v)}
             matchPaths={["/admin/users"]}
+            defaultTo="/admin/users?view=everyone"
           >
             <SubNavItem label="Everyone" to="/admin/users?view=everyone" dot />
             <SubNavItem label="Analytics" to="/admin/users?view=analytics" dot />

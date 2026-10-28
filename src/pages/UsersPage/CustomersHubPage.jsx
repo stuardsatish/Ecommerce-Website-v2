@@ -13,13 +13,92 @@ import CustomerAnalyticsPage from "./CustomerAnalyticsPage"
 /* ── Pelago design tokens ── */
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
+export const getDateBounds = (range = "Today", customFrom = "", customTo = "") => {
+  const norm = String(range || "").trim().toLowerCase()
+  const now = new Date()
+  let startDate = new Date(0)
+  let endDate = new Date(now)
+  let prevStart = new Date(0)
+  let prevEnd = new Date(0)
+  let isAllTime = false
+  let label = "All Time"
+
+  if (norm === "today") {
+    startDate = new Date(now)
+    startDate.setHours(0, 0, 0, 0)
+    endDate = new Date(now)
+    endDate.setHours(23, 59, 59, 999)
+    prevStart = new Date(startDate.getTime() - 86400000)
+    prevEnd = new Date(startDate.getTime() - 1)
+    label = "Today"
+  } else if (norm === "last 7 days" || norm === "7d") {
+    startDate = new Date(now.getTime() - 7 * 86400000)
+    endDate = new Date(now)
+    prevStart = new Date(startDate.getTime() - 7 * 86400000)
+    prevEnd = new Date(startDate.getTime() - 1)
+    label = "Last 7 Days"
+  } else if (norm === "last 30 days" || norm === "30d") {
+    startDate = new Date(now.getTime() - 30 * 86400000)
+    endDate = new Date(now)
+    prevStart = new Date(startDate.getTime() - 30 * 86400000)
+    prevEnd = new Date(startDate.getTime() - 1)
+    label = "Last 30 Days"
+  } else if (norm === "last 90 days" || norm === "90d") {
+    startDate = new Date(now.getTime() - 90 * 86400000)
+    endDate = new Date(now)
+    prevStart = new Date(startDate.getTime() - 90 * 86400000)
+    prevEnd = new Date(startDate.getTime() - 1)
+    label = "Last 90 Days"
+  } else if (norm === "last 6 months" || norm === "6m") {
+    startDate = new Date(now.getTime() - 180 * 86400000)
+    endDate = new Date(now)
+    prevStart = new Date(startDate.getTime() - 180 * 86400000)
+    prevEnd = new Date(startDate.getTime() - 1)
+    label = "Last 6 Months"
+  } else if (norm === "custom") {
+    const valid = customFrom && customTo && !isNaN(new Date(customFrom).getTime()) && !isNaN(new Date(customTo).getTime())
+    if (valid) {
+      startDate = new Date(customFrom)
+      startDate.setHours(0, 0, 0, 0)
+      endDate = new Date(customTo)
+      endDate.setHours(23, 59, 59, 999)
+      const duration = Math.max(86400000, endDate.getTime() - startDate.getTime())
+      prevStart = new Date(startDate.getTime() - duration)
+      prevEnd = new Date(startDate.getTime() - 1)
+      label = `${customFrom} – ${customTo}`
+    } else {
+      startDate = new Date(now.getTime() - 30 * 86400000)
+      endDate = new Date(now)
+      prevStart = new Date(startDate.getTime() - 30 * 86400000)
+      prevEnd = new Date(startDate.getTime() - 1)
+      label = "Custom"
+    }
+  } else {
+    // All Time
+    isAllTime = true
+    startDate = new Date(0)
+    endDate = new Date(8640000000000000)
+    prevStart = null
+    prevEnd = null
+    label = "All Time"
+  }
+
+  return { startDate, endDate, prevStart, prevEnd, isAllTime, label }
+}
 
 const CustomersHubPage = () => {
   const [params, setParams] = useSearchParams()
   const activeTab = params.get("view") === "analytics" ? "analytics" : "everyone"
 
-  // Active date range filter
+  // Active date range filter & custom dates
   const [activeDateRange, setActiveDateRange] = useState("Today")
+  const [customFrom, setCustomFrom] = useState(() => new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10))
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10))
+
+  // Date bounds helper
+  const dateBounds = useMemo(() => {
+    return getDateBounds(activeDateRange, customFrom, customTo)
+  }, [activeDateRange, customFrom, customTo])
 
   // Starred customers
   const [starredIds, setStarredIds] = useState(() => {
@@ -153,6 +232,7 @@ const CustomersHubPage = () => {
   /* ── Merge Database Profiles with Order Analytics ── */
   const allCustomers = useMemo(() => {
     const customersMap = {}
+    const { startDate, endDate, isAllTime } = dateBounds
 
     // 1. Index profiles
     for (const p of profiles) {
@@ -237,7 +317,7 @@ const CustomersHubPage = () => {
       }
     }
 
-    // 3. Deduplicate and compute individual metrics
+    // 3. Deduplicate and compute individual metrics (both all-time and period-specific)
     const uniqueCustomers = Array.from(new Set(Object.values(customersMap)))
 
     return uniqueCustomers.map((c) => {
@@ -257,6 +337,22 @@ const CustomersHubPage = () => {
       const aov = ordersCount > 0 ? Math.round(totalSpent / ordersCount) : 0
       const channel = c.rawProfile?.channel || (totalSpent > 25000 ? "Wholesale" : "Retail")
 
+      // Period-filtered orders for this customer
+      const periodOrders = sortedOrders.filter((ord) => {
+        if (isAllTime) return true
+        const od = new Date(ord.createdAt || ord.created_at || 0)
+        return od >= startDate && od <= endDate
+      })
+      const periodOrdersCount = periodOrders.length
+      const periodSpent = periodOrders.reduce(
+        (sum, ord) => sum + (Number(ord.total || ord.totalAmount) || 0),
+        0
+      )
+      const periodAov = periodOrdersCount > 0 ? Math.round(periodSpent / periodOrdersCount) : 0
+      const periodLastOrder = periodOrders[0]
+        ? periodOrders[0].createdAt || periodOrders[0].created_at
+        : null
+
       return {
         ...c,
         orders: sortedOrders,
@@ -266,63 +362,197 @@ const CustomersHubPage = () => {
         aov,
         channel,
         isStarred: starredIds.includes(c.id),
+        // Filtered period metrics
+        periodOrders,
+        periodOrdersCount,
+        periodSpent,
+        periodAov,
+        periodLastOrder,
       }
     })
-  }, [profiles, orders, starredIds])
+  }, [profiles, orders, starredIds, dateBounds])
 
-  /* ── 6 KPI Metrics + Segment Calculation ── */
+  /* ── 6 KPI Metrics + Segment Calculation Based on Selected Filter ── */
   const metrics = useMemo(() => {
-    const totalUsers = allCustomers.length
-    const totalOrders = allCustomers.reduce((acc, c) => acc + (c.ordersCount || 0), 0)
-    const totalRevenue = allCustomers.reduce((acc, c) => acc + (c.totalSpent || 0), 0)
+    const { startDate, endDate, prevStart, prevEnd, isAllTime, label } = dateBounds
+
+    // 1. Filter orders in current period
+    const periodOrders = orders.filter((o) => {
+      if (isAllTime) return true
+      const d = new Date(o.createdAt || o.created_at || 0)
+      return d >= startDate && d <= endDate
+    })
+
+    const totalOrders = periodOrders.length
+    const totalRevenue = periodOrders.reduce((sum, o) => sum + (Number(o.total || o.totalAmount) || 0), 0)
     const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
 
-    // Top spender
-    const sortedBySpend = [...allCustomers].sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0))
-    const topSpender = sortedBySpend[0] || { name: "No customers yet", totalSpent: 0 }
+    // 2. Previous period orders for comparison
+    const prevOrders = prevStart && prevEnd
+      ? orders.filter((o) => {
+          const d = new Date(o.createdAt || o.created_at || 0)
+          return d >= prevStart && d <= prevEnd
+        })
+      : []
+    const prevOrdersCount = prevOrders.length
+    const prevRevenue = prevOrders.reduce((sum, o) => sum + (Number(o.total || o.totalAmount) || 0), 0)
+    const prevAov = prevOrdersCount > 0 ? Math.round(prevRevenue / prevOrdersCount) : 0
+    const prevUserIds = new Set(
+      prevOrders.map((o) => o.userId || o.user_id || o.userEmail || o.customerEmail).filter(Boolean)
+    )
 
-    // Retention (last 30 days)
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
-    const activeUsersCount = allCustomers.filter((c) => {
-      if (!c.lastOrder) return false
-      return new Date(c.lastOrder).getTime() >= thirtyDaysAgo
-    }).length
-    const retentionPct = totalUsers > 0 ? Math.min(100, Math.round((activeUsersCount / totalUsers) * 100)) : 100
+    // 3. Customers who placed orders or joined in the period
+    const periodCustomerIds = new Set(
+      periodOrders.map((o) => o.userId || o.user_id || o.userEmail || o.customerEmail).filter(Boolean)
+    )
+    const activeCustomersInPeriod = allCustomers.filter((c) =>
+      isAllTime ? c.ordersCount > 0 : c.periodOrdersCount > 0
+    )
+    const activeUsersCount = activeCustomersInPeriod.length
+    const activeUsersSpend = activeCustomersInPeriod.reduce(
+      (sum, c) => sum + (isAllTime ? c.totalSpent : c.periodSpent),
+      0
+    )
 
-    // Segments counts & share
-    const collectors = allCustomers.filter((c) => c.totalSpent >= 15000)
-    const collectorsRev = collectors.reduce((acc, c) => acc + c.totalSpent, 0)
+    const newUsersInPeriod = allCustomers.filter((c) => {
+      const jd = new Date(c.joinDate)
+      return isAllTime ? true : (jd >= startDate && jd <= endDate)
+    })
+
+    // Total Users for period
+    const distinctPeriodUsers = allCustomers.filter(
+      (c) => (c.periodOrdersCount > 0) || (new Date(c.joinDate) >= startDate && new Date(c.joinDate) <= endDate)
+    )
+    const totalUsers = isAllTime ? allCustomers.length : distinctPeriodUsers.length
+
+    // 4. Comparison subtitles
+    const usersSubtitle = isAllTime
+      ? "all in studio"
+      : prevUserIds.size > 0
+      ? `${Math.round(((distinctPeriodUsers.length - prevUserIds.size) / prevUserIds.size) * 100)}% vs prev`
+      : distinctPeriodUsers.length > 0 ? "+100% vs prev" : "0% vs prev"
+
+    const ordersSubtitle = isAllTime
+      ? "all time"
+      : prevOrdersCount > 0
+      ? `${Math.round(((totalOrders - prevOrdersCount) / prevOrdersCount) * 100)}% vs prev`
+      : totalOrders > 0 ? "+100%" : "0%"
+
+    const revenueSubtitle = isAllTime
+      ? "all time"
+      : prevRevenue > 0
+      ? `${Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100)}% vs prev`
+      : totalRevenue > 0 ? "+100%" : "0%"
+
+    const aovSubtitle = isAllTime
+      ? "all time"
+      : prevAov > 0
+      ? `${Math.round(((aov - prevAov) / prevAov) * 100)}% vs prev`
+      : "0%"
+
+    // 5. Top Spender in this period
+    const sortedByPeriodSpend = [...allCustomers].sort(
+      (a, b) => (isAllTime ? b.totalSpent || 0 : b.periodSpent || 0) - (isAllTime ? a.totalSpent || 0 : a.periodSpent || 0)
+    )
+    const topSpenderRaw = sortedByPeriodSpend[0]
+    const topSpender =
+      topSpenderRaw && (isAllTime ? topSpenderRaw.totalSpent > 0 : topSpenderRaw.periodSpent > 0)
+        ? {
+            ...topSpenderRaw,
+            name: topSpenderRaw.name,
+            totalSpent: isAllTime ? topSpenderRaw.totalSpent : topSpenderRaw.periodSpent,
+            periodSpent: isAllTime ? topSpenderRaw.totalSpent : topSpenderRaw.periodSpent,
+          }
+        : { name: "None in period", totalSpent: 0, periodSpent: 0 }
+
+    // 6. Retention rate
+    const repeatActiveUsers = activeCustomersInPeriod.filter((c) =>
+      isAllTime ? c.ordersCount >= 2 : (c.periodOrdersCount >= 2 || c.ordersCount >= 2)
+    )
+    const retentionPct =
+      activeUsersCount > 0
+        ? Math.min(100, Math.round((repeatActiveUsers.length / activeUsersCount) * 100))
+        : 100
+    const activeUserSubtitle = `${activeUsersCount} active · ${retentionPct}% Retention`
+
+    // 7. Segments counts & share (dynamically scaled for period)
+    const collectorThreshold = isAllTime
+      ? 15000
+      : activeDateRange === "Today"
+      ? 500
+      : activeDateRange === "Last 7 Days"
+      ? 1500
+      : activeDateRange === "Last 30 Days"
+      ? 3000
+      : activeDateRange === "Last 90 Days"
+      ? 6000
+      : 10000
+
+    const collectors = allCustomers.filter(
+      (c) => (isAllTime ? c.totalSpent || 0 : c.periodSpent || 0) >= collectorThreshold
+    )
+    const collectorsRev = collectors.reduce(
+      (acc, c) => acc + (isAllTime ? c.totalSpent || 0 : c.periodSpent || 0),
+      0
+    )
     const collectorsShare = totalRevenue > 0 ? Math.round((collectorsRev / totalRevenue) * 100) : 0
 
-    const regulars = allCustomers.filter((c) => c.ordersCount >= 3)
-    const regularsRev = regulars.reduce((acc, c) => acc + c.totalSpent, 0)
+    const regulars = allCustomers.filter((c) =>
+      isAllTime ? c.ordersCount >= 3 : (c.periodOrdersCount >= 2 || (c.ordersCount >= 2 && c.periodOrdersCount >= 1))
+    )
+    const regularsRev = regulars.reduce(
+      (acc, c) => acc + (isAllTime ? c.totalSpent || 0 : c.periodSpent || 0),
+      0
+    )
     const regularsShare = totalRevenue > 0 ? Math.round((regularsRev / totalRevenue) * 100) : 0
 
     const newThisMonth = allCustomers.filter((c) => {
       const d = new Date(c.joinDate).getTime()
-      return d >= thirtyDaysAgo
+      return isAllTime ? d >= Date.now() - 30 * 86400000 : (d >= startDate.getTime() && d <= endDate.getTime())
     })
+    const newThisMonthRev = newThisMonth.reduce(
+      (acc, c) => acc + (isAllTime ? c.totalSpent || 0 : c.periodSpent || 0),
+      0
+    )
+    const newMonthShare = totalRevenue > 0 ? Math.round((newThisMonthRev / totalRevenue) * 100) : (newThisMonth.length > 0 ? 15 : 0)
 
-    const sixtyDaysAgo = Date.now() - 60 * 24 * 60 * 60 * 1000
     const driftingAway = allCustomers.filter((c) => {
       if (!c.lastOrder) return false
-      return new Date(c.lastOrder).getTime() < sixtyDaysAgo
+      return isAllTime
+        ? new Date(c.lastOrder).getTime() < Date.now() - 60 * 86400000
+        : (c.periodOrdersCount === 0 && new Date(c.lastOrder) < startDate)
     })
 
-    const wholesale = allCustomers.filter((c) => String(c.channel || "").toLowerCase() === "wholesale")
-    const wholesaleRev = wholesale.reduce((acc, c) => acc + c.totalSpent, 0)
+    const wholesale = allCustomers.filter(
+      (c) =>
+        String(c.channel || "").toLowerCase() === "wholesale" &&
+        (isAllTime ? (c.ordersCount > 0 || c.totalSpent > 0) : c.periodOrdersCount > 0)
+    )
+    const wholesaleRev = wholesale.reduce(
+      (acc, c) => acc + (isAllTime ? c.totalSpent || 0 : c.periodSpent || 0),
+      0
+    )
     const wholesaleShare = totalRevenue > 0 ? Math.round((wholesaleRev / totalRevenue) * 100) : 0
 
-    const retail = allCustomers.filter((c) => String(c.channel || "").toLowerCase() !== "wholesale")
-    const retailRev = retail.reduce((acc, c) => acc + c.totalSpent, 0)
-    const retailShare = totalRevenue > 0 ? Math.round((retailRev / totalRevenue) * 100) : 0
+    const retail = allCustomers.filter(
+      (c) =>
+        String(c.channel || "").toLowerCase() !== "wholesale" &&
+        (isAllTime ? (c.ordersCount > 0 || c.totalSpent > 0) : c.periodOrdersCount > 0)
+    )
+    const retailRev = retail.reduce(
+      (acc, c) => acc + (isAllTime ? c.totalSpent || 0 : c.periodSpent || 0),
+      0
+    )
+    const retailShare = totalRevenue > 0 ? Math.round((retailRev / totalRevenue) * 100) : 100
 
     // Today's counter
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
     const todayOrders = orders.filter((o) => new Date(o.createdAt || o.created_at || 0) >= todayStart)
     const todayCount = todayOrders.length
-    const todayRev = Math.round(todayOrders.reduce((acc, o) => acc + (Number(o.total || o.totalAmount) || 0), 0) / 1000)
+    const todayRev = Math.round(
+      todayOrders.reduce((acc, o) => acc + (Number(o.total || o.totalAmount) || 0), 0) / 1000
+    )
 
     return {
       totalUsers,
@@ -331,24 +561,45 @@ const CustomersHubPage = () => {
       aov,
       topSpender,
       activeUsersCount,
+      activeUsersSpend,
+      activeUserSubtitle,
+      usersSubtitle,
+      ordersSubtitle,
+      revenueSubtitle,
+      aovSubtitle,
       retentionPct,
       todayCount,
       todayRev,
+      collectorThreshold,
       collectorsCount: collectors.length,
       collectorsShare,
+      collectorsList: collectors,
       regularsCount: regulars.length,
       regularsShare,
+      regularsList: regulars,
       newMonthCount: newThisMonth.length,
+      newMonthShare,
+      newThisMonthList: newThisMonth,
       driftingCount: driftingAway.length,
+      driftingList: driftingAway,
       wholesaleCount: wholesale.length,
       wholesaleShare,
       wholesaleRev,
+      wholesaleList: wholesale,
       retailCount: retail.length,
       retailShare,
       retailRev,
       maxSpend: Math.max(...allCustomers.map((c) => c.totalSpent || 0), 10000),
+      maxPeriodSpend: Math.max(
+        ...allCustomers.map((c) => (isAllTime ? c.totalSpent || 0 : c.periodSpent || 0)),
+        5000
+      ),
+      everyoneTotalUsers: allCustomers.length,
+      allCustomersCount: allCustomers.length,
+      dateBounds,
+      periodLabel: label,
     }
-  }, [allCustomers, orders])
+  }, [allCustomers, orders, dateBounds, activeDateRange])
 
   /* ── Trigger Export for Active Tab ── */
   const handleExport = useCallback(() => {
@@ -414,8 +665,14 @@ const CustomersHubPage = () => {
     starredIds,
     toggleStar,
     activeDateRange,
+    setActiveDateRange,
+    customFrom,
+    setCustomFrom,
+    customTo,
+    setCustomTo,
+    dateBounds,
     refetchData: fetchData,
-  }), [allCustomers, metrics, profiles, orders, starredIds, toggleStar, activeDateRange, fetchData])
+  }), [allCustomers, metrics, profiles, orders, starredIds, toggleStar, activeDateRange, customFrom, customTo, dateBounds, fetchData])
 
   return (
     <div
@@ -429,6 +686,10 @@ const CustomersHubPage = () => {
         metrics={metrics}
         activeDateRange={activeDateRange}
         setActiveDateRange={setActiveDateRange}
+        customFrom={customFrom}
+        setCustomFrom={setCustomFrom}
+        customTo={customTo}
+        setCustomTo={setCustomTo}
         onExport={handleExport}
         onNewCustomer={() => setShowNewCustomerModal(true)}
       />

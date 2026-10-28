@@ -253,7 +253,7 @@ export function mapRequestItem(i) {
     productId: (oi && oi.product_id) || '',
     quantity: Number(i.quantity) || 0,
     orderedQuantity: oi ? Number(oi.quantity) || 0 : 0,
-    unitPrice: Number(i.unit_price) || 0,
+    unitPrice: Number(i.unit_price) || (oi && Number(oi.unit_price ?? oi.price)) || 0,
     status: i.item_status,
     reasonCode: i.reason_code || '',
     condition: i.item_condition || '',
@@ -276,14 +276,22 @@ export function mapRequestRow(row) {
   if (!row) return null
   const priv = Array.isArray(row.return_request_private) ? row.return_request_private[0] : row.return_request_private
   const order = Array.isArray(row.orders) ? row.orders[0] : row.orders
+  const items = (row.return_request_items || []).map(mapRequestItem)
+  const itemsTotal = items.reduce((sum, it) => sum + ((Number(it.unitPrice) || 0) * (Number(it.quantity) || 1)), 0)
+  const orderTotal = order ? Number(order.total) || 0 : 0
+  const refundAmount = itemsTotal > 0 ? itemsTotal : orderTotal
+  const reason = row.description || (row.reason_code ? row.reason_code.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Customer return')
+
   return {
     id: row.id,
     requestNo: row.request_no,
     orderId: row.order_id,
     userId: row.user_id || null,
-    type: row.type,
+    type: row.type || 'return',
     status: row.status,
     reasonCode: row.reason_code,
+    reason,
+    refundAmount,
     description: row.description || '',
     contactPhone: row.contact_phone || '',
     deliveredAt: row.delivered_at || null,
@@ -295,7 +303,7 @@ export function mapRequestRow(row) {
     closedAt: row.closed_at || null,
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || null,
-    items: (row.return_request_items || []).map(mapRequestItem),
+    items,
     evidence: (row.return_request_evidence || []).map((e) => ({ id: e.id, path: e.storage_path, mime: e.mime, size: Number(e.size_bytes) || 0, createdAt: e.created_at || null })),
     events: (row.return_request_events || [])
       .map((e) => ({ id: e.id, itemId: e.item_id || null, from: e.from_status || '', to: e.to_status || '', actorRole: e.actor_role, note: e.note || '', internal: !!e.internal, createdAt: e.created_at }))

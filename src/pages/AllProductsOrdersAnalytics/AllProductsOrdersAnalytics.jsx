@@ -66,6 +66,259 @@ const FILTERS = [
     { key: "custom", label: "Custom" },
 ]
 
+const MONTH_SHORT_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+const getPeriodLabel = (filter, customFrom, customTo) => {
+    if (filter === "today") return "Today"
+    if (filter === "week") return "Last 7 Days"
+    if (filter === "month") return "Last 30 Days"
+    if (filter === "quarter") return "Last 90 Days"
+    if (filter === "halfyear") return "Last 6 Months"
+    if (filter === "custom") {
+        if (customFrom && customTo) {
+            const f = new Date(customFrom)
+            const t = new Date(customTo)
+            return `${f.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${t.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+        }
+        return "Custom Period"
+    }
+    return "All Time"
+}
+
+function generatePeriodBuckets(filter, startDate, endDate, now) {
+    const buckets = []
+    let matrixTitle = "Category Performance by Month"
+    let matrixSubtitle = "12-Month Historical Matrix"
+
+    if (filter === "today") {
+        matrixTitle = "Category Performance by Hour"
+        matrixSubtitle = "Today's Hourly Matrix"
+        const labels = ["12a", "3a", "6a", "9a", "12p", "3p", "6p", "9p"]
+        const fullLabels = [
+            "12 AM - 3 AM", "3 AM - 6 AM", "6 AM - 9 AM", "9 AM - 12 PM",
+            "12 PM - 3 PM", "3 PM - 6 PM", "6 PM - 9 PM", "9 PM - 12 AM"
+        ]
+        const todayBase = new Date(startDate)
+        const curHour = now.getHours()
+
+        for (let i = 0; i < 8; i++) {
+            const bStart = new Date(todayBase.getFullYear(), todayBase.getMonth(), todayBase.getDate(), i * 3, 0, 0, 0)
+            const bEnd = new Date(todayBase.getFullYear(), todayBase.getMonth(), todayBase.getDate(), (i + 1) * 3 - 1, 59, 59, 999)
+            const isCurrent = curHour >= i * 3 && curHour < (i + 1) * 3
+            buckets.push({
+                key: `today-${i * 3}`,
+                m: labels[i],
+                fullLabel: fullLabels[i],
+                start: bStart,
+                end: bEnd,
+                online: 0,
+                cod: 0,
+                total: 0,
+                active: isCurrent,
+            })
+        }
+    } else if (filter === "week") {
+        matrixTitle = "Category Performance by Day"
+        matrixSubtitle = "7-Day Daily Matrix"
+        for (let i = 6; i >= 0; i--) {
+            const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, 0, 0, 0, 0)
+            const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, 23, 59, 59, 999)
+            const dayLabel = `${dayStart.getDate()} ${MONTH_SHORT_NAMES[dayStart.getMonth()]}`
+            const fullLabel = dayStart.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })
+            buckets.push({
+                key: `day-${dayStart.getFullYear()}-${dayStart.getMonth() + 1}-${dayStart.getDate()}`,
+                m: dayLabel,
+                fullLabel,
+                start: dayStart,
+                end: dayEnd,
+                online: 0,
+                cod: 0,
+                total: 0,
+                active: i === 0,
+            })
+        }
+    } else if (filter === "month") {
+        matrixTitle = "Category Performance (30 Days)"
+        matrixSubtitle = "5-Day Interval Matrix"
+        for (let i = 5; i >= 0; i--) {
+            const bStart = new Date(now.getTime() - (i + 1) * 5 * 86400000)
+            bStart.setHours(0, 0, 0, 0)
+            const bEnd = new Date(now.getTime() - i * 5 * 86400000)
+            if (i === 0) {
+                bEnd.setTime(now.getTime())
+            } else {
+                bEnd.setHours(23, 59, 59, 999)
+            }
+            const m = `${bStart.getDate()}-${bEnd.getDate()} ${MONTH_SHORT_NAMES[bEnd.getMonth()]}`
+            const fullLabel = `${bStart.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${bEnd.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+            buckets.push({
+                key: `int-30-${i}`,
+                m,
+                fullLabel,
+                start: bStart,
+                end: bEnd,
+                online: 0,
+                cod: 0,
+                total: 0,
+                active: i === 0,
+            })
+        }
+    } else if (filter === "quarter") {
+        matrixTitle = "Category Performance (90 Days)"
+        matrixSubtitle = "3-Month Historical Matrix"
+        for (let i = 2; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            const mStart = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0)
+            const mEnd = i === 0 ? now : new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+            const label = MONTH_SHORT_NAMES[d.getMonth()]
+            const fullLabel = `${MONTH_SHORT_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`
+            buckets.push({
+                key: `month-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+                m: label,
+                fullLabel,
+                start: mStart,
+                end: mEnd,
+                online: 0,
+                cod: 0,
+                total: 0,
+                active: i === 0,
+            })
+        }
+    } else if (filter === "halfyear") {
+        matrixTitle = "Category Performance (6 Months)"
+        matrixSubtitle = "6-Month Historical Matrix"
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            const mStart = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0)
+            const mEnd = i === 0 ? now : new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+            const label = MONTH_SHORT_NAMES[d.getMonth()]
+            const fullLabel = `${MONTH_SHORT_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`
+            buckets.push({
+                key: `month-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+                m: label,
+                fullLabel,
+                start: mStart,
+                end: mEnd,
+                online: 0,
+                cod: 0,
+                total: 0,
+                active: i === 0,
+            })
+        }
+    } else if (filter === "custom") {
+        const diffDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000))
+        matrixTitle = "Category Performance"
+        matrixSubtitle = `Custom (${startDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${endDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" })})`
+
+        if (diffDays <= 1) {
+            const labels = ["12a", "3a", "6a", "9a", "12p", "3p", "6p", "9p"]
+            const fullLabels = [
+                "12 AM - 3 AM", "3 AM - 6 AM", "6 AM - 9 AM", "9 AM - 12 PM",
+                "12 PM - 3 PM", "3 PM - 6 PM", "6 PM - 9 PM", "9 PM - 12 AM"
+            ]
+            for (let i = 0; i < 8; i++) {
+                const bStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), i * 3, 0, 0, 0)
+                const bEnd = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), (i + 1) * 3 - 1, 59, 59, 999)
+                buckets.push({
+                    key: `custom-hour-${i}`,
+                    m: labels[i],
+                    fullLabel: fullLabels[i],
+                    start: bStart,
+                    end: bEnd,
+                    online: 0,
+                    cod: 0,
+                    total: 0,
+                    active: i === 7,
+                })
+            }
+        } else if (diffDays <= 14) {
+            for (let i = 0; i < diffDays; i++) {
+                const dayStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i, 0, 0, 0, 0)
+                const dayEnd = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i, 23, 59, 59, 999)
+                const dayLabel = `${dayStart.getDate()} ${MONTH_SHORT_NAMES[dayStart.getMonth()]}`
+                const fullLabel = dayStart.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })
+                buckets.push({
+                    key: `custom-day-${dayStart.getFullYear()}-${dayStart.getMonth() + 1}-${dayStart.getDate()}`,
+                    m: dayLabel,
+                    fullLabel,
+                    start: dayStart,
+                    end: dayEnd,
+                    online: 0,
+                    cod: 0,
+                    total: 0,
+                    active: i === diffDays - 1,
+                })
+            }
+        } else if (diffDays <= 90) {
+            const spanMs = (endDate.getTime() - startDate.getTime()) / 6
+            for (let i = 0; i < 6; i++) {
+                const bStart = new Date(startDate.getTime() + i * spanMs)
+                const bEnd = new Date(startDate.getTime() + (i + 1) * spanMs)
+                const m = `${bStart.getDate()} ${MONTH_SHORT_NAMES[bStart.getMonth()]}`
+                const fullLabel = `${bStart.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${bEnd.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+                buckets.push({
+                    key: `custom-int-${i}`,
+                    m,
+                    fullLabel,
+                    start: bStart,
+                    end: bEnd,
+                    online: 0,
+                    cod: 0,
+                    total: 0,
+                    active: i === 5,
+                })
+            }
+        } else {
+            let cur = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+            let count = 0
+            while (cur <= endDate && count < 12) {
+                const mStart = new Date(cur.getFullYear(), cur.getMonth(), 1, 0, 0, 0, 0)
+                const mEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0, 23, 59, 59, 999)
+                const label = MONTH_SHORT_NAMES[cur.getMonth()]
+                const fullLabel = `${MONTH_SHORT_NAMES[cur.getMonth()]} '${String(cur.getFullYear()).slice(-2)}`
+                buckets.push({
+                    key: `custom-m-${cur.getFullYear()}-${cur.getMonth() + 1}`,
+                    m: label,
+                    fullLabel,
+                    start: mStart,
+                    end: mEnd,
+                    online: 0,
+                    cod: 0,
+                    total: 0,
+                    active: false,
+                })
+                cur.setMonth(cur.getMonth() + 1)
+                count++
+            }
+            if (buckets.length > 0) buckets[buckets.length - 1].active = true
+        }
+    } else {
+        // filter === "" (All Time)
+        matrixTitle = "Category Performance by Month"
+        matrixSubtitle = "12-Month Historical Matrix"
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            const mStart = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0)
+            const mEnd = i === 0 ? now : new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+            const label = MONTH_SHORT_NAMES[d.getMonth()]
+            const fullLabel = `${MONTH_SHORT_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`
+            buckets.push({
+                key: `month-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+                m: label,
+                fullLabel,
+                start: mStart,
+                end: mEnd,
+                online: 0,
+                cod: 0,
+                total: 0,
+                active: i === 0,
+            })
+        }
+    }
+
+    return { buckets, matrixTitle, matrixSubtitle }
+}
+
 const LOW_STOCK = 10
 const stockStatus = (s) => (s <= 0 ? "out" : s <= LOW_STOCK ? "low" : "in")
 const statusLabelOf = (s) => (stockStatus(s) === "out" ? "Out of Stock" : stockStatus(s) === "low" ? "Low Stock" : "In Stock")
@@ -100,9 +353,21 @@ const AllProductsOrdersAnalytics = ({
     onStatsChange,
     actionsRef,
     dateRange,
+    customFrom: propCustomFrom = "",
+    customTo: propCustomTo = "",
 }) => {
     const [loading, setLoading] = useState(false)
     const [filter, setFilter] = useState("month")
+    const [customFrom, setCustomFrom] = useState(propCustomFrom)
+    const [customTo, setCustomTo] = useState(propCustomTo)
+
+    useEffect(() => {
+        if (propCustomFrom !== undefined && propCustomFrom !== null) setCustomFrom(propCustomFrom)
+    }, [propCustomFrom])
+
+    useEffect(() => {
+        if (propCustomTo !== undefined && propCustomTo !== null) setCustomTo(propCustomTo)
+    }, [propCustomTo])
 
     useEffect(() => {
         if (dateRange !== undefined && dateRange !== null) {
@@ -119,8 +384,6 @@ const AllProductsOrdersAnalytics = ({
 
     const [searchQuery, setSearchQuery] = useState("")
     const [sortBy, setSortBy] = useState("revenue")
-    const [customFrom, setCustomFrom] = useState("")
-    const [customTo, setCustomTo] = useState("")
 
     // Per-product analytics drawer
     const [selectedProductAnalytics, setSelectedProductAnalytics] = useState(null)
@@ -158,7 +421,7 @@ const AllProductsOrdersAnalytics = ({
             setLoading(true)
             const now = new Date()
             const days = PERIOD_DAYS[filter] ?? 30
-            const customValid = filter === "custom" && customFrom && customTo && new Date(customFrom) <= new Date(customTo)
+            const customValid = filter === "custom" && customFrom && customTo && !isNaN(new Date(customFrom).getTime()) && !isNaN(new Date(customTo).getTime())
             let startDate, endDate, prevStart
             if (filter === "custom") {
                 if (customValid) {
@@ -166,19 +429,26 @@ const AllProductsOrdersAnalytics = ({
                     startDate.setHours(0, 0, 0, 0)
                     endDate = new Date(customTo)
                     endDate.setHours(23, 59, 59, 999)
-                    const rangeDays = Math.max(1, Math.round((endDate - startDate) / 86400000))
+                    const rangeDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000))
                     prevStart = new Date(startDate.getTime() - rangeDays * 86400000)
                 } else {
                     startDate = new Date(0)
                     endDate = now
                     prevStart = new Date(0)
                 }
-            } else {
-                startDate = filter === "today"
-                    ? new Date(new Date().setHours(0, 0, 0, 0))
-                    : (filter === "" ? new Date(0) : new Date(now.getTime() - days * 86400000))
+            } else if (filter === "today") {
+                startDate = new Date(now)
+                startDate.setHours(0, 0, 0, 0)
                 endDate = now
-                prevStart = filter === "" ? new Date(0) : new Date(now.getTime() - 2 * days * 86400000)
+                prevStart = new Date(startDate.getTime() - 86400000)
+            } else if (filter === "") {
+                startDate = new Date(0)
+                endDate = now
+                prevStart = new Date(0)
+            } else {
+                startDate = new Date(now.getTime() - days * 86400000)
+                endDate = now
+                prevStart = new Date(now.getTime() - 2 * days * 86400000)
             }
 
             const todayStart = new Date()
@@ -213,6 +483,8 @@ const AllProductsOrdersAnalytics = ({
             if (ordersErr) console.error("ordersErr", ordersErr)
             const orderRows = mapOrderRows(rawOrdersData || [])
 
+            const { buckets, matrixTitle, matrixSubtitle } = generatePeriodBuckets(filter, startDate, endDate, now)
+
             let totalRevenue = 0, totalOrders = 0, totalUnits = 0
             let prevRevenue = 0, prevOrders = 0, prevUnits = 0
             const dateMap = {}, productMap = {}, prevProductMap = {}, categoryMap = {}, prevCategoryMap = {}
@@ -220,26 +492,7 @@ const AllProductsOrdersAnalytics = ({
             const userPeriod = {}
             const customerSpend = {}
             const curChannels = { online: 0, cod: 0 }
-            const catMonthlySales = {} // category -> { monthKey -> number }
-
-            // Build 12-month buckets for timeline bar chart
-            const monthShortNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-            const monthBuckets = []
-            for (let i = 11; i >= 0; i--) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-                const label = `${monthShortNames[d.getMonth()]}`
-                const fullLabel = `${monthShortNames[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`
-                monthBuckets.push({
-                    key,
-                    m: label,
-                    fullLabel,
-                    online: 0,
-                    cod: 0,
-                    total: 0,
-                    active: i === 0,
-                })
-            }
+            const catBucketSales = {} // category -> { bucketKey -> number }
 
             // Process order rows
             orderRows.forEach((order) => {
@@ -255,15 +508,6 @@ const AllProductsOrdersAnalytics = ({
                     curTodayRev += orderTotal
                 }
 
-                // 12-month timeline bucket (independent of filter)
-                const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-                const mb = monthBuckets.find((b) => b.key === mKey)
-                if (mb) {
-                    if (isCod) mb.cod += orderTotal
-                    else mb.online += orderTotal
-                    mb.total += orderTotal
-                }
-
                 const inCur = d >= startDate && d <= endDate
                 const inPrev = !inCur && d >= prevStart && d < startDate
                 if (!inCur && !inPrev) return
@@ -274,6 +518,14 @@ const AllProductsOrdersAnalytics = ({
                 const items = order.products || []
 
                 if (inCur) {
+                    // Populate timeline bar bucket for current period
+                    const b = buckets.find((bucket) => d >= bucket.start && d <= bucket.end)
+                    if (b) {
+                        if (isCod) b.cod += orderTotal
+                        else b.online += orderTotal
+                        b.total += orderTotal
+                    }
+
                     userPeriod[uid].cur++
                     totalOrders++
                     totalRevenue += orderTotal
@@ -305,11 +557,14 @@ const AllProductsOrdersAnalytics = ({
                     const lineRev = Number(p.lineTotal) > 0 ? Number(p.lineTotal) : (unitPrice * qty)
                     const category = catObj?.category || p.category || "General"
 
-                    // Track heatmap category monthly sales
-                    if (!catMonthlySales[category]) catMonthlySales[category] = {}
-                    catMonthlySales[category][mKey] = (catMonthlySales[category][mKey] || 0) + lineRev
-
                     if (inCur) {
+                        // Track category bucket sales for heatmap matrix
+                        const b = buckets.find((bucket) => d >= bucket.start && d <= bucket.end)
+                        if (b) {
+                            if (!catBucketSales[category]) catBucketSales[category] = {}
+                            catBucketSales[category][b.key] = (catBucketSales[category][b.key] || 0) + lineRev
+                        }
+
                         totalUnits += qty
                         activeIds.add(pid)
 
@@ -434,31 +689,37 @@ const AllProductsOrdersAnalytics = ({
             const sortedBuyers = Object.values(customerSpend).sort((a, b) => b.spend - a.spend)
             const topSpender = sortedBuyers[0] || null
 
-            // 12-month timeline bars
-            const maxBarTotal = Math.max(...monthBuckets.map((b) => b.total), 1)
-            const computedBars = monthBuckets.map((b) => {
+            // Timeline bars for selected period
+            const maxBarTotal = Math.max(...buckets.map((b) => b.total), 1)
+            const computedBars = buckets.map((b) => {
                 const onlineRatio = b.total > 0 ? (b.online / b.total) : 1
                 const codRatio = b.total > 0 ? (b.cod / b.total) : 0
                 return {
                     ...b,
-                    h: Math.max(6, Math.round((b.total / maxBarTotal) * 44)),
+                    h: b.total > 0 ? Math.max(6, Math.round((b.total / maxBarTotal) * 44)) : 2,
                     onlineH: onlineRatio,
                     codH: codRatio,
                 }
             })
 
-            // Heatmap Matrix: real categories across 12 months
-            const matrixCategories = catArray.length > 0 ? catArray.slice(0, 6).map((c) => c.name) : Object.keys(catMonthlySales).slice(0, 6)
+            // Heatmap Matrix: categories across period buckets
+            const catalogCategories = Array.from(new Set(Object.values(catalogById).map((c) => c.category || "General")))
+            const matrixCategories = catArray.length > 0
+                ? catArray.slice(0, 6).map((c) => c.name)
+                : Object.keys(catBucketSales).length > 0
+                ? Object.keys(catBucketSales).slice(0, 6)
+                : catalogCategories.slice(0, 6)
+
             const matrixRows = matrixCategories.map((catName) => {
-                const vals = monthBuckets.map((b) => {
-                    const r = catMonthlySales[catName]?.[b.key] || 0
+                const vals = buckets.map((b) => {
+                    const r = catBucketSales[catName]?.[b.key] || 0
                     if (r <= 0) return "₹0"
                     if (r >= 1000) return `₹${(r / 1000).toFixed(r >= 10000 ? 0 : 1)}k`
                     return `₹${Math.round(r)}`
                 })
-                const bgs = monthBuckets.map((b) => {
-                    const r = catMonthlySales[catName]?.[b.key] || 0
-                    if (r <= 0) return "#8C8478"
+                const bgs = buckets.map((b) => {
+                    const r = catBucketSales[catName]?.[b.key] || 0
+                    if (r <= 0) return "#DED6C9"
                     return "#124B43"
                 })
                 return { name: catName, vals, bgs }
@@ -511,8 +772,26 @@ const AllProductsOrdersAnalytics = ({
             setTimelineBars(computedBars)
             setTopBuyer(topSpender)
             setChannelBreakdown(curChannels)
-            setMonthlyCatMatrix({ months: monthBuckets.map((b) => b.m), rows: matrixRows })
+            setMonthlyCatMatrix({
+                title: matrixTitle,
+                subtitle: matrixSubtitle,
+                months: buckets.map((b) => b.m),
+                rows: matrixRows,
+            })
             setCategoryCollections(catCollectionList)
+
+            if (typeof onStatsChange === "function") {
+                onStatsChange({
+                    revenue: totalRevenue,
+                    orders: totalOrders,
+                    customers: customersWithOrders,
+                    aov: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+                    productsSold: totalUnits,
+                    activeProducts: activeIds.size,
+                    todayCount: curTodayCount,
+                    todayRev: curTodayRev,
+                })
+            }
         } catch (err) {
             console.error("fetchDashboard error", err)
         } finally {
@@ -845,7 +1124,7 @@ const AllProductsOrdersAnalytics = ({
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-[11px] font-bold text-[#111817]">Period Performance</p>
-                                    <p className="text-[10px] text-[#78716A]">Active Filters</p>
+                                    <p className="text-[10px] text-[#78716A]">{getPeriodLabel(filter, customFrom, customTo)}</p>
                                 </div>
                                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#166534] bg-[#DCFCE7] px-2 py-0.5 rounded-full">
                                     <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span> live
@@ -1157,9 +1436,13 @@ const AllProductsOrdersAnalytics = ({
                         <svg className="w-4 h-4 text-[#0F3D39]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
                         </svg>
-                        <h3 className="text-xs font-bold text-[#111817] uppercase tracking-wide">Category Performance by Month</h3>
+                        <h3 className="text-xs font-bold text-[#111817] uppercase tracking-wide">
+                            {monthlyCatMatrix.title || "Category Performance by Month"}
+                        </h3>
                     </div>
-                    <span className="text-[11px] text-[#78716A]">12-Month Historical Matrix</span>
+                    <span className="text-[11px] text-[#78716A]">
+                        {monthlyCatMatrix.subtitle || "12-Month Historical Matrix"}
+                    </span>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1192,8 +1475,8 @@ const AllProductsOrdersAnalytics = ({
                             ))}
                             {(!monthlyCatMatrix.rows || monthlyCatMatrix.rows.length === 0) && (
                                 <tr>
-                                    <td colSpan={13} className="py-6 text-center text-xs text-[#78716A]">
-                                        No historical category breakdown available.
+                                    <td colSpan={(monthlyCatMatrix.months?.length || 12) + 1} className="py-6 text-center text-xs text-[#78716A]">
+                                        No category breakdown available for this period.
                                     </td>
                                 </tr>
                             )}
@@ -1204,7 +1487,13 @@ const AllProductsOrdersAnalytics = ({
 
             {/* BEGIN: Categories Collection Cards */}
             <section className="space-y-3 mb-5">
-                <h3 className="text-sm font-bold text-[#111817]">Catalog Categories Breakdown</h3>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-sm font-bold text-[#111817]">Catalog Categories Breakdown</h3>
+                        <p className="text-[11px] text-[#78716A]">Total SKUs with sold units and revenue for {getPeriodLabel(filter, customFrom, customTo)}</p>
+                    </div>
+                    <span className="text-xs text-[#78716A]">{categoryCollections.length} Categories</span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                     {categoryCollections.map((col, idx) => (
                         <div
@@ -1267,7 +1556,7 @@ const AllProductsOrdersAnalytics = ({
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
                     <div>
                         <h3 style={{ fontSize: "15px", fontWeight: 800, color: INK, margin: 0 }}>Stock &amp; Sales Performance</h3>
-                        <p style={{ fontSize: "11px", color: MUTED, margin: "2px 0 0" }}>Product-level sales metrics, remaining inventory, and unit velocity</p>
+                        <p style={{ fontSize: "11px", color: MUTED, margin: "2px 0 0" }}>Product-level sales metrics for {getPeriodLabel(filter, customFrom, customTo)}, remaining inventory, and unit velocity</p>
                     </div>
 
                     <div style={{ position: "relative", minWidth: "200px" }}>

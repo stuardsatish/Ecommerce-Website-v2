@@ -58,7 +58,7 @@ function ReceivedModal({ onSubmit, onClose }) {
  * Everything the admin needs for ONE return / exchange request: who and what, the evidence, the policy deadline, the original shipment,
  * the decision per item, the return logistics, the inspection, the history - and the next step buttons the state machine allows.
  */
-const RequestDetail = ({ request, onChanged }) => {
+const RequestDetail = ({ request, onChanged, onSwitchType }) => {
   const [parcels, setParcels] = useState([])
   const [outbound, setOutbound] = useState([])
   const [prompt, setPrompt] = useState(null)             // { kind } while a small dialog is open
@@ -170,8 +170,25 @@ const RequestDetail = ({ request, onChanged }) => {
           {actions.includes("replacement") ? <p style={{ fontFamily: INTER, fontSize: "13px", color: "var(--color-body)", alignSelf: "center" }}>The replacement is shipped, settled and delivered in the Replacement section above.</p> : null}
           {actions.includes("close") ? <button type="button" disabled={busy} style={GHOST_BTN} onClick={() => confirmMove("closed", "Close this request? It cannot be changed afterwards.", "Request closed")}>Close request</button> : null}
           {actions.includes("message") ? <button type="button" disabled={busy} style={GHOST_BTN} onClick={() => setPrompt({ kind: "message" })}>Message the customer</button> : null}
-          {actions.includes("note") ? <button type="button" disabled={busy} style={GHOST_BTN} onClick={() => setPrompt({ kind: "note" })}>Internal note</button> : null}
           {actions.includes("cancel") ? <button type="button" disabled={busy} style={{ ...GHOST_BTN, color: "var(--color-error)" }} onClick={() => setPrompt({ kind: "cancel" })}>Cancel request</button> : null}
+          {["pending_review", "needs_info", "approved"].includes(request.status) ? (
+            <button
+              type="button"
+              disabled={busy}
+              style={GHOST_BTN}
+              onClick={async () => {
+                const nextType = request.type === "return" ? "exchange" : "return"
+                if (window.confirm(`Switch this request from ${requestTypeLabel(request.type)} to ${requestTypeLabel(nextType)}?`)) {
+                  if (onSwitchType) {
+                    await onSwitchType(nextType)
+                    refresh()
+                  }
+                }
+              }}
+            >
+              Switch to {request.type === "return" ? "Exchange" : "Return"}
+            </button>
+          ) : null}
           {actions.length === 0 ? <p style={{ fontFamily: INTER, fontSize: "13px", color: "var(--color-muted)" }}>This request is {adminStatusLabel(request.status).toLowerCase()}; nothing more can be done.</p> : null}
         </div>
       </Section>

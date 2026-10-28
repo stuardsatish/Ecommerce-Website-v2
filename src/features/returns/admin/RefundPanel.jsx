@@ -3,7 +3,8 @@ import { toast } from "react-toastify"
 import { returnsService } from "../../../services/returns"
 import { formatMoney, refundBreakdownRows, validateRefundForm } from "../refundModel"
 import RefundCard from "./RefundCard"
-import { ERROR_STYLE, HINT_STYLE, INPUT_STYLE, LABEL_STYLE, PRIMARY_BTN } from "../../orders/shipping/shipmentUi"
+import ModalShell from "../../../components/Common/ModalShell"
+import { ERROR_STYLE, GHOST_BTN, HINT_STYLE, INPUT_STYLE, LABEL_STYLE, PRIMARY_BTN } from "../../orders/shipping/shipmentUi"
 
 const INTER = "'Inter', sans-serif"
 const EMPTY_FORM = { method: "", includeShipping: null, adjustment: "", adjustmentNote: "", note: "" }
@@ -29,6 +30,7 @@ const RefundPanel = ({ request, onDone }) => {
   const [calcError, setCalcError] = useState("")
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
+  const [confirmModal, setConfirmModal] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -59,26 +61,68 @@ const RefundPanel = ({ request, onDone }) => {
     return () => { alive = false; clearTimeout(timer) }
   }, [canCreate, request.id, form.includeShipping, adj])
 
+  // Smart-default payment method based on server calculation
+  useEffect(() => {
+    if (calc && (!form.method || (form.method === "razorpay" && !calc.razorpayPossible))) {
+      setForm((f) => ({
+        ...f,
+        method: calc.razorpayPossible ? "razorpay" : "manual",
+      }))
+    }
+  }, [calc, form.method])
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const refresh = async () => { await load(); onDone?.() }
 
-  const create = async () => {
-    if (busy || !calc) return
+  const handleInitiateCreate = () => {
+    if (busy) return
+    if (!calc) {
+      toast.error("Refund calculation is still loading. Please wait a moment.")
+      return
+    }
     const v = validateRefundForm(form)
     setErrors(v.errors)
-    if (!v.ok) return
-    if (v.args.method === "razorpay" && !calc.razorpayPossible) { setErrors({ method: "This order was not paid through Razorpay - choose a manual refund" }); return }
-    const how = v.args.method === "razorpay" ? "It will then be sent to Razorpay." : "You will pay it out yourself and record the reference."
-    if (!window.confirm(`Create a refund of ${formatMoney(calc.amount, calc.currency)}? ${how}`)) return
+    if (!v.ok) {
+      const firstErr = v.errors.method || v.errors.adjustment || v.errors.adjustmentNote || v.errors.note
+      if (firstErr) toast.error(firstErr)
+      return
+    }
+    if (v.args.method === "razorpay" && !calc.razorpayPossible) {
+      setErrors({ method: "This order was not paid through Razorpay - choose a manual refund" })
+      toast.error("This order was not paid through Razorpay - choose a manual refund")
+      return
+    }
+    setConfirmModal(true)
+  }
+
+  const executeCreate = async () => {
+    if (busy || !calc) return
+    const v = validateRefundForm(form)
+    if (!v.ok) {
+      setErrors(v.errors)
+      toast.error(Object.values(v.errors)[0] || "Validation failed")
+      setConfirmModal(false)
+      return
+    }
     setBusy(true)
     try {
-      const r = await returnsService.createRefund({ requestId: request.id, key, method: v.args.method, includeShipping: v.args.includeShipping, adjustment: v.args.adjustment, adjustmentNote: v.args.adjustmentNote, note: v.args.note })
+      const r = await returnsService.createRefund({
+        requestId: request.id,
+        key,
+        method: v.args.method,
+        includeShipping: v.args.includeShipping,
+        adjustment: v.args.adjustment,
+        adjustmentNote: v.args.adjustmentNote,
+        note: v.args.note,
+      })
       toast.success(r.created ? `Refund ${r.refundNo} created` : `Refund ${r.refundNo} already existed`)
       setKey(newKey())
       setForm(EMPTY_FORM)
       setErrors({})
+      setConfirmModal(false)
       await refresh()
     } catch (err) {
+      console.error("Refund creation error:", err)
       toast.error(err.message || "Could not create the refund")
     } finally {
       setBusy(false)
@@ -158,11 +202,83 @@ const RefundPanel = ({ request, onDone }) => {
                 <input id="rf-note" value={form.note} onChange={(e) => set("note", e.target.value)} style={INPUT_STYLE} maxLength={1000} disabled={busy} />
               </div>
               <div>
-                <button type="button" onClick={create} disabled={busy} style={{ ...PRIMARY_BTN, opacity: busy ? 0.7 : 1 }}>{busy ? "Working..." : `Create refund of ${formatMoney(calc.amount, calc.currency)}`}</button>
+                <button
+                  type="button"
+                  id="create-refund-btn"
+                  onClick={handleInitiateCreate}
+                  disabled={busy}
+                  style={{ ...PRIMARY_BTN, opacity: busy ? 0.7 : 1 }}
+                >
+                  {busy ? "Working..." : `Create refund of ${formatMoney(calc.amount, calc.currency)}`}
+                </button>
               </div>
             </>
           ) : !calcError ? <p style={HINT_STYLE}>Calculating...</p> : null}
         </div>
+      ) : null}
+
+      {/* Confirmation Modal */}
+      {confirmModal && calc ? (
+        <ModalShell
+          open
+          onClose={() => { if (!busy) setConfirmModal(false) }}
+          busy={busy}
+          width={480}
+          title="Confirm Refund"
+          subtitle={`Return #${request.requestNo || ""}`}
+          footer={(
+            <>
+              <button
+                type="button"
+                onClick={() => setConfirmModal(false)}
+                disabled={busy}
+                style={GHOST_BTN}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="btn-confirm-execute-refund"
+                onClick={executeCreate}
+                disabled={busy}
+                style={{ ...PRIMARY_BTN, opacity: busy ? 0.7 : 1 }}
+              >
+                {busy ? "Creating refund..." : `Confirm refund of ${formatMoney(calc.amount, calc.currency)}`}
+              </button>
+            </>
+          )}
+        >
+          <div className="flex flex-col" style={{ gap: "14px", fontFamily: INTER, fontSize: "13px" }}>
+            <div style={{ background: "var(--color-surface-muted, #F4EFEA)", padding: "16px", borderRadius: "12px", textAlign: "center" }}>
+              <p style={{ fontSize: "12px", color: "var(--color-muted, #78716C)", marginBottom: "4px" }}>Refund Amount</p>
+              <p style={{ fontSize: "28px", fontWeight: 800, color: "var(--color-ink, #1C1917)" }}>
+                {formatMoney(calc.amount, calc.currency)}
+              </p>
+              <p style={{ fontSize: "12px", color: "var(--color-body, #44403C)", marginTop: "4px" }}>
+                Method: <b>{form.method === "razorpay" ? "Through Razorpay" : "Manual (bank / UPI / cash)"}</b>
+              </p>
+            </div>
+
+            <p style={{ color: "var(--color-body, #44403C)", lineHeight: 1.5 }}>
+              {form.method === "razorpay"
+                ? "This refund will be registered and queued to be sent to Razorpay."
+                : "You will pay out this refund yourself and record the payment reference in the next step."}
+            </p>
+
+            {form.adjustment && Number(form.adjustment) !== 0 ? (
+              <div style={{ padding: "10px 12px", borderRadius: "8px", background: "rgba(0,0,0,0.03)", border: "1px solid var(--color-border)" }}>
+                <p style={{ fontWeight: 600 }}>Adjustment: {formatMoney(form.adjustment, calc.currency)}</p>
+                {form.adjustmentNote ? <p style={{ fontSize: "12px", color: "var(--color-muted)" }}>Reason: {form.adjustmentNote}</p> : null}
+              </div>
+            ) : null}
+
+            {form.note ? (
+              <p style={{ fontSize: "12px", color: "var(--color-muted)" }}>
+                Staff note: {form.note}
+              </p>
+            ) : null}
+          </div>
+        </ModalShell>
       ) : null}
 
       {refunds.length > 0 ? (

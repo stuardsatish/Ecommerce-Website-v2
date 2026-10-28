@@ -68,13 +68,40 @@ const formatRelativeTime = (dateStr) => {
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return "recently"
   const diffMs = Date.now() - d.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
-  if (diffHours < 1) return "just now"
-  if (diffHours === 1) return "1 h ago"
-  if (diffHours < 24) return `${diffHours} h ago`
   const diffDays = Math.floor(diffHours / 24)
-  if (diffDays === 1) return "1 d ago"
-  return `${diffDays} d ago`
+
+  // Absolute time in IST (or local timezone)
+  const absTime = d.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
+  })
+  const absDate = d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    timeZone: "Asia/Kolkata",
+  })
+
+  let relative
+  if (diffMins < 1) relative = "just now"
+  else if (diffMins < 60) relative = `${diffMins} min ago`
+  else if (diffHours < 24) relative = `${diffHours} h ago`
+  else if (diffDays === 1) relative = "Yesterday"
+  else relative = `${diffDays} d ago`
+
+  // For cards: show relative + absolute clock
+  const isToday = diffDays < 1 && diffHours < 24
+  return { relative, abs: isToday ? absTime : `${absDate}, ${absTime}` }
+}
+
+// Helper to render the time chip text from formatRelativeTime result
+const fmtTime = (dateStr) => {
+  const r = formatRelativeTime(dateStr)
+  if (typeof r === "string") return r // fallback for "recently"
+  return `${r.relative} · ${r.abs}`
 }
 
 const PackingBenchKanban = ({
@@ -399,17 +426,42 @@ const PackingBenchKanban = ({
     })
   }, [orders, searchQuery, paymentFilter, statusFilter])
 
-  // Split into 3 Kanban columns
+  // Helper: pick the best sort date for an order
+  const getSortDate = (o, preferField) => {
+    const d = (s) => (s ? new Date(s).getTime() : 0)
+    if (preferField) {
+      const v = d(o[preferField])
+      if (v > 0) return v
+    }
+    return d(o.updatedAt) || d(o.createdAt) || 0
+  }
+
+  // Split into 3 Kanban columns — newest first
   const confirmedList = useMemo(() => {
-    return filteredOrders.filter((o) => ["placed", "confirmed"].includes(o.orderStatus))
+    return filteredOrders
+      .filter((o) => ["placed", "confirmed"].includes(o.orderStatus))
+      .slice()
+      .sort((a, b) => getSortDate(b) - getSortDate(a))
   }, [filteredOrders])
 
   const shippedList = useMemo(() => {
-    return filteredOrders.filter((o) => o.orderStatus === "shipped")
+    return filteredOrders
+      .filter((o) => o.orderStatus === "shipped")
+      .slice()
+      .sort((a, b) => {
+        // prefer shipment shippedAt then updatedAt then createdAt
+        const shippedAtA = a.shipments?.[0]?.shippedAt
+        const shippedAtB = b.shipments?.[0]?.shippedAt
+        return getSortDate(b, null) - getSortDate(a, null) ||
+          (shippedAtB ? new Date(shippedAtB).getTime() : 0) - (shippedAtA ? new Date(shippedAtA).getTime() : 0)
+      })
   }, [filteredOrders])
 
   const deliveredList = useMemo(() => {
-    return filteredOrders.filter((o) => o.orderStatus === "delivered")
+    return filteredOrders
+      .filter((o) => o.orderStatus === "delivered")
+      .slice()
+      .sort((a, b) => getSortDate(b, "deliveredAt") - getSortDate(a, "deliveredAt"))
   }, [filteredOrders])
 
   // Summaries per column
@@ -439,6 +491,40 @@ const PackingBenchKanban = ({
     )
     return { rev: rev || 2335, items: items || 53 }
   }, [deliveredList])
+
+  /* ============================== COLUMN PAGINATION (MAX 10 PER TAB) ============================== */
+  const KANBAN_PAGE_SIZE = 10
+
+  const [pageConfirmed, setPageConfirmed] = useState(1)
+  const [pageShipped, setPageShipped] = useState(1)
+  const [pageDelivered, setPageDelivered] = useState(1)
+
+  // Reset to page 1 on filter or search changes
+  useEffect(() => {
+    setPageConfirmed(1)
+    setPageShipped(1)
+    setPageDelivered(1)
+  }, [searchQuery, paymentFilter, statusFilter])
+
+  // Paginated slices (max 10 records per tab/column)
+  const pagedConfirmedList = useMemo(() => {
+    const start = (pageConfirmed - 1) * KANBAN_PAGE_SIZE
+    return confirmedList.slice(start, start + KANBAN_PAGE_SIZE)
+  }, [confirmedList, pageConfirmed])
+
+  const pagedShippedList = useMemo(() => {
+    const start = (pageShipped - 1) * KANBAN_PAGE_SIZE
+    return shippedList.slice(start, start + KANBAN_PAGE_SIZE)
+  }, [shippedList, pageShipped])
+
+  const pagedDeliveredList = useMemo(() => {
+    const start = (pageDelivered - 1) * KANBAN_PAGE_SIZE
+    return deliveredList.slice(start, start + KANBAN_PAGE_SIZE)
+  }, [deliveredList, pageDelivered])
+
+  const totalConfirmedPages = Math.max(1, Math.ceil(confirmedList.length / KANBAN_PAGE_SIZE))
+  const totalShippedPages = Math.max(1, Math.ceil(shippedList.length / KANBAN_PAGE_SIZE))
+  const totalDeliveredPages = Math.max(1, Math.ceil(deliveredList.length / KANBAN_PAGE_SIZE))
 
   return (
     <div style={{ fontFamily: FONT }} className="flex-1 flex flex-col gap-4 text-[#2C3437] min-w-0 pb-12">
@@ -827,7 +913,7 @@ const PackingBenchKanban = ({
                 <p className="text-xs font-semibold">No confirmed orders awaiting packing</p>
               </div>
             ) : (
-              confirmedList.map((order) => {
+              pagedConfirmedList.map((order) => {
                 const avStyle = getAvatarColor(order.userName || order.customerName)
                 const itemsCount = (order.products || []).reduce((s, p) => s + (p.quantity || 1), 0)
                 const firstItem = order.products?.[0]
@@ -843,7 +929,7 @@ const PackingBenchKanban = ({
                       <span className="font-bold text-[#111827]">{orderNum}</span>
                       <span className="text-[#787F89] flex items-center gap-1 text-[9.5px]">
                         <Clock size={10} />
-                        <span>{formatRelativeTime(order.createdAt || order.date)}</span>
+                        <span>{fmtTime(order.createdAt || order.date)}</span>
                       </span>
                     </div>
 
@@ -912,6 +998,37 @@ const PackingBenchKanban = ({
                 )
               })
             )}
+
+            {/* Confirmed Orders Pagination */}
+            {confirmedList.length > KANBAN_PAGE_SIZE && (
+              <div className="pt-2 mt-auto border-t border-[#E9E4DC] flex items-center justify-between text-[11px] text-[#646A74] select-none">
+                <span className="font-medium text-[10px]">
+                  {(pageConfirmed - 1) * KANBAN_PAGE_SIZE + 1}–
+                  {Math.min(pageConfirmed * KANBAN_PAGE_SIZE, confirmedList.length)} of {confirmedList.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={pageConfirmed === 1}
+                    onClick={() => setPageConfirmed((p) => Math.max(1, p - 1))}
+                    className="px-2 py-0.5 rounded border border-[#DDD7CC] bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F2F7F6] text-[10px] font-semibold text-[#104945] transition-colors cursor-pointer"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-1 text-[10px] font-bold text-[#111827]">
+                    {pageConfirmed} / {totalConfirmedPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pageConfirmed >= totalConfirmedPages}
+                    onClick={() => setPageConfirmed((p) => Math.min(totalConfirmedPages, p + 1))}
+                    className="px-2 py-0.5 rounded border border-[#DDD7CC] bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F2F7F6] text-[10px] font-semibold text-[#104945] transition-colors cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* COLUMN 2: Shipped */}
@@ -935,7 +1052,7 @@ const PackingBenchKanban = ({
                 <p className="text-xs font-semibold">No active shipments in transit</p>
               </div>
             ) : (
-              shippedList.map((order) => {
+              pagedShippedList.map((order) => {
                 const avStyle = getAvatarColor(order.userName || order.customerName)
                 const itemsCount = (order.products || []).reduce((s, p) => s + (p.quantity || 1), 0)
                 const orderNum = order.invoiceNumber || (order.id ? `PG-${order.id.slice(0, 5)}` : "PG-10768")
@@ -950,7 +1067,7 @@ const PackingBenchKanban = ({
                       <span className="font-bold text-[#111827]">{orderNum}</span>
                       <span className="text-[#787F89] flex items-center gap-1 text-[9.5px]">
                         <Clock size={10} />
-                        <span>packed {formatRelativeTime(order.shippedAt || order.createdAt)}</span>
+                        <span>shipped {fmtTime(order.shipments?.[0]?.shippedAt || order.updatedAt || order.createdAt)}</span>
                       </span>
                     </div>
 
@@ -1002,6 +1119,37 @@ const PackingBenchKanban = ({
                 )
               })
             )}
+
+            {/* Shipped Orders Pagination */}
+            {shippedList.length > KANBAN_PAGE_SIZE && (
+              <div className="pt-2 mt-auto border-t border-[#E9E4DC] flex items-center justify-between text-[11px] text-[#646A74] select-none">
+                <span className="font-medium text-[10px]">
+                  {(pageShipped - 1) * KANBAN_PAGE_SIZE + 1}–
+                  {Math.min(pageShipped * KANBAN_PAGE_SIZE, shippedList.length)} of {shippedList.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={pageShipped === 1}
+                    onClick={() => setPageShipped((p) => Math.max(1, p - 1))}
+                    className="px-2 py-0.5 rounded border border-[#DDD7CC] bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F2F7F6] text-[10px] font-semibold text-[#104945] transition-colors cursor-pointer"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-1 text-[10px] font-bold text-[#111827]">
+                    {pageShipped} / {totalShippedPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pageShipped >= totalShippedPages}
+                    onClick={() => setPageShipped((p) => Math.min(totalShippedPages, p + 1))}
+                    className="px-2 py-0.5 rounded border border-[#DDD7CC] bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F2F7F6] text-[10px] font-semibold text-[#104945] transition-colors cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* COLUMN 3: Delivered */}
@@ -1026,7 +1174,7 @@ const PackingBenchKanban = ({
                 <p className="text-xs font-semibold">No delivered orders yet</p>
               </div>
             ) : (
-              deliveredList.map((order) => {
+              pagedDeliveredList.map((order) => {
                 const avStyle = getAvatarColor(order.userName || order.customerName)
                 const itemsCount = (order.products || []).reduce((s, p) => s + (p.quantity || 1), 0)
                 const firstItem = order.products?.[0]
@@ -1044,7 +1192,7 @@ const PackingBenchKanban = ({
                       <span className="font-bold text-[#111827]">{orderNum}</span>
                       <span className="text-[#787F89] flex items-center gap-1 text-[9.5px]">
                         <Clock size={10} />
-                        <span>FedEx · {formatRelativeTime(order.deliveredAt || order.createdAt)}</span>
+                        <span>{fmtTime(order.deliveredAt || order.shipments?.[0]?.deliveredAt || order.updatedAt || order.createdAt)}</span>
                       </span>
                     </div>
 
@@ -1103,6 +1251,37 @@ const PackingBenchKanban = ({
                   </div>
                 )
               })
+            )}
+
+            {/* Delivered Orders Pagination */}
+            {deliveredList.length > KANBAN_PAGE_SIZE && (
+              <div className="pt-2 mt-auto border-t border-[#E9E4DC] flex items-center justify-between text-[11px] text-[#646A74] select-none">
+                <span className="font-medium text-[10px]">
+                  {(pageDelivered - 1) * KANBAN_PAGE_SIZE + 1}–
+                  {Math.min(pageDelivered * KANBAN_PAGE_SIZE, deliveredList.length)} of {deliveredList.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={pageDelivered === 1}
+                    onClick={() => setPageDelivered((p) => Math.max(1, p - 1))}
+                    className="px-2 py-0.5 rounded border border-[#DDD7CC] bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F2F7F6] text-[10px] font-semibold text-[#104945] transition-colors cursor-pointer"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-1 text-[10px] font-bold text-[#111827]">
+                    {pageDelivered} / {totalDeliveredPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pageDelivered >= totalDeliveredPages}
+                    onClick={() => setPageDelivered((p) => Math.min(totalDeliveredPages, p + 1))}
+                    className="px-2 py-0.5 rounded border border-[#DDD7CC] bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F2F7F6] text-[10px] font-semibold text-[#104945] transition-colors cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>

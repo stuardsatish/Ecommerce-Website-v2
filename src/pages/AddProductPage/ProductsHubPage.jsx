@@ -29,6 +29,8 @@ const ProductsHubPage = () => {
 
   // Date range filter state shared with header & tabs
   const [activeDateRange, setActiveDateRange] = useState("all")
+  const [customFrom, setCustomFrom] = useState(() => new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10))
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10))
 
   // Expose child page action refs for common header buttons
   const catalogActionsRef = useRef(null)
@@ -128,6 +130,10 @@ const ProductsHubPage = () => {
         onSwitchTab={switchTab}
         dateRange={activeDateRange}
         setDateRange={setActiveDateRange}
+        customFrom={customFrom}
+        setCustomFrom={setCustomFrom}
+        customTo={customTo}
+        setCustomTo={setCustomTo}
         catalogStats={catalogStats}
         analyticsStats={analyticsStats}
         onExport={handleExport}
@@ -158,6 +164,8 @@ const ProductsHubPage = () => {
             onSwitchTab={switchTab}
             showHeader={false}
             dateRange={activeDateRange}
+            customFrom={customFrom}
+            customTo={customTo}
             onStatsChange={handleAnalyticsStatsChange}
             actionsRef={analyticsActionsRef}
           />
