@@ -41,6 +41,7 @@ const BillingPage = lazy(() => import("./pages/BillingPage/BillingPage"))
 const Optimization = lazy(() => import("./pages/Optimization/Optimization"))
 const AdminReturnsPage = lazy(() => import("./pages/AdminReturnsPage/AdminReturnsPage"))
 const AdminInventoryPage = lazy(() => import("./pages/AdminInventoryPage/AdminInventoryPage"))
+const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage/ChangePasswordPage"))
 const MyReturnsPage = lazy(() => import("./pages/MyReturnsPage/MyReturnsPage"))
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage/NotificationsPage"))
 const AdminDashboard = lazy(() => import("./pages/Dashboard/AdminDashboard"))
@@ -396,6 +397,8 @@ const App = () => {
           <Route path="/admin/returns" element={<AdminRoute><AdminLayout><OrdersHubPage /></AdminLayout></AdminRoute>} />
 
           <Route path="/admin/inventory" element={<AdminRoute><AdminLayout><AdminInventoryPage /></AdminLayout></AdminRoute>} />
+
+          <Route path="/admin/change-password" element={<AdminRoute><AdminLayout><ChangePasswordPage /></AdminLayout></AdminRoute>} />
 
           <Route path="/admin/add-discount" element={<AdminRoute><AdminLayout><AddDiscountPage /></AdminLayout></AdminRoute>} />
 

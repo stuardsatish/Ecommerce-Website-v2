@@ -5,6 +5,7 @@ import { supabase } from "../../context/SupabaseConfig"
 import { clearUser } from "../../context/UserSlice"
 import { broadcastAuth, clearSession } from "../../utils/sessionUtils"
 import { clearLocalSession } from "../../utils/sessionManager"
+import { KeyRound } from "lucide-react"
 
 /* ─── Brand colour tokens (matching the new Pelago HTML designs) ─── */
 const TEAL      = "#104945"
@@ -340,6 +341,25 @@ const AdminSidebar = () => {
           <Icon d={ICONS.logout} />
           Logout
         </button>
+
+        {/* Change Password */}
+        <NavLink
+          to="/admin/change-password"
+          style={({ isActive }) => ({
+            display: "flex", alignItems: "center", gap: "9px",
+            padding: "7px 10px", borderRadius: "10px",
+            fontSize: "12.5px", fontWeight: 600,
+            color: isActive ? TEAL : MUTED,
+            background: isActive ? TEAL_BG : "transparent",
+            textDecoration: "none",
+            transition: "background 0.15s, color 0.15s",
+          })}
+          onMouseEnter={e => { e.currentTarget.style.background = "#F5F2EE"; e.currentTarget.style.color = INK }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = MUTED }}
+        >
+          <KeyRound size={16} />
+          Change Password
+        </NavLink>
       </div>
     </aside>
   )
