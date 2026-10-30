@@ -8,6 +8,8 @@ import {
     saveShippingSettings,
     getGstSettings,
     saveGstSettings,
+    getGiftWrapSettings,
+    saveGiftWrapSettings,
 } from "../services/settingsService";
 import { toast } from "react-toastify";
 
@@ -37,28 +39,36 @@ export const useSettings = () => {
         shippingCost: 49,
     });
     const [gstSettings, setGstSettings] = useState({ gstEnabled: true });
+    const [giftWrapSettings, setGiftWrapSettings] = useState({
+        giftWrapEnabled: false,
+        giftWrapFree: true,
+        giftWrapCost: 0,
+    });
     const [loading, setLoading] = useState(true);
     const [savingPayment, setSavingPayment] = useState(false);
     const [savingInvoice, setSavingInvoice] = useState(false);
     const [savingShipping, setSavingShipping] = useState(false);
     const [savingGst, setSavingGst] = useState(false);
+    const [savingGiftWrap, setSavingGiftWrap] = useState(false);
 
     useEffect(() => {
         let active = true;
         const loadSettings = async () => {
             try {
                 setLoading(true);
-                const [payData, invData, shipData, gstData] = await Promise.all([
+                const [payData, invData, shipData, gstData, giftData] = await Promise.all([
                     getPaymentSettings(),
                     getInvoiceSettings(),
                     getShippingSettings(),
                     getGstSettings(),
+                    getGiftWrapSettings(),
                 ]);
                 if (active) {
                     setPaymentSettings(payData);
                     setInvoiceSettings(invData);
                     setShippingSettings(shipData);
                     setGstSettings(gstData);
+                    setGiftWrapSettings(giftData);
                 }
             } catch (error) {
                 console.error("Error loading settings:", error);
@@ -143,19 +153,38 @@ export const useSettings = () => {
         }
     };
 
+    const updateGiftWrapSettings = async (newGift) => {
+        try {
+            setSavingGiftWrap(true);
+            await saveGiftWrapSettings(newGift);
+            setGiftWrapSettings(newGift);
+            toast.success("Gift wrapping settings saved successfully");
+            return true;
+        } catch (error) {
+            console.error("Error saving gift wrap settings:", error);
+            toast.error("Failed to save gift wrapping settings.");
+            return false;
+        } finally {
+            setSavingGiftWrap(false);
+        }
+    };
+
     return {
         paymentSettings,
         invoiceSettings,
         shippingSettings,
         gstSettings,
+        giftWrapSettings,
         loading,
         savingPayment,
         savingInvoice,
         savingShipping,
         savingGst,
+        savingGiftWrap,
         updatePaymentSettings,
         updateInvoiceSettings,
         updateShippingSettings,
         updateGstSettings,
+        updateGiftWrapSettings,
     };
 };

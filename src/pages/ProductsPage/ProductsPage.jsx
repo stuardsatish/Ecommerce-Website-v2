@@ -433,7 +433,8 @@ const ProductsPage = () => {
 
             const { data: productRows, error: productError } = await supabase
                 .from("products")
-                .select("*");
+                .select("*")
+                .neq("status", "draft");
             if (productError) throw productError;
 
             const { data: reviewsData } = await supabase.from("reviews").select("product_id, rating");
@@ -466,9 +467,7 @@ const ProductsPage = () => {
     };
 
     useEffect(() => {
-        if (!products.length) {
-            fetchProducts();
-        }
+        fetchProducts(); // re-fetch on mount to respect admin status changes
         setRecentlyViewedIds(getRecentlyViewedIds());
     }, []);
 
@@ -493,6 +492,7 @@ const ProductsPage = () => {
                     : true) &&
                 getMrp(product) >= minPrice &&
                 Number(product.rating || 0) >= minRating &&
+                product.status !== "draft" &&
                 product.title?.toLowerCase().includes(search.toLowerCase())
             );
         });
@@ -675,6 +675,7 @@ const ProductsPage = () => {
                 !selectedDepartments.includes(p.category)
             )
                 return false;
+            if (p.status === "draft") return false;
             if (activeChip !== "all" && p.category !== activeChip) return false;
             if (getPrice(p) < minP || getPrice(p) > maxP) return false;
             if (Number(p.rating || 0) < minRatingDesk) return false;

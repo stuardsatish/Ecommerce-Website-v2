@@ -26,6 +26,16 @@ export default function VariantManager({ attributes, setAttributes, variantRows,
     const [attrName, setAttrName] = useState("")
     const [attrOptions, setAttrOptions] = useState("")
     const [draft, setDraft] = useState({ name: "", price: "", stock: "", sku: "" })
+    const [draftImageFile, setDraftImageFile] = useState(null)
+    const [draftImagePreview, setDraftImagePreview] = useState("")
+
+    const onDraftImage = (file) => {
+        if (!file) return
+        const v = validateImageFile(file)
+        if (!v.ok) return alert(v.error)
+        setDraftImageFile(file)
+        setDraftImagePreview(URL.createObjectURL(file))
+    }
 
     const patchRow = (i, patch) => setVariantRows((rows) => rows.map((x, j) => (j === i ? { ...x, ...patch } : x)))
 
@@ -46,8 +56,12 @@ export default function VariantManager({ attributes, setAttributes, variantRows,
         }
         setVariantRows((r) => [...r, newVariantRow(`var_${Date.now()}`, {
             name: draft.name.trim(), price: draft.price, stock: draft.stock || "0", sku: draft.sku || "",
+            imageFile: draftImageFile || null,
+            imagePreview: draftImagePreview || "",
         })])
         setDraft({ name: "", price: "", stock: "", sku: "" })
+        setDraftImageFile(null)
+        setDraftImagePreview("")
     }
 
     const onVariantImage = (i, file) => {
@@ -69,7 +83,7 @@ export default function VariantManager({ attributes, setAttributes, variantRows,
             {/* Step 1: generate from attributes */}
             <div className="mb-4 p-4 rounded-xl" style={{ background: "var(--color-surface)", border: `1px solid ${C.border}` }}>
                 <p className="text-[12px] font-bold uppercase tracking-wider mb-1" style={{ color: C.textS }}>Generate variants from attributes</p>
-                <p className="text-[11px] mb-3" style={{ color: C.textS }}>e.g. Attribute “Color” → Options “Pink, White, Violet”. Existing variants are kept; only missing combinations are added.</p>
+                <p className="text-[11px] mb-3" style={{ color: C.textS }}>e.g. Attribute "Color" → Options "Pink, White, Violet". Existing variants are kept; only missing combinations are added.</p>
                 <div className="flex gap-2 flex-wrap">
                     <input value={attrName} onChange={(e) => setAttrName(e.target.value)} placeholder="Attribute name (e.g. Color)"
                         className={inputCls} style={{ flex: 1, minWidth: 130 }} aria-label="Attribute name" />
@@ -101,6 +115,28 @@ export default function VariantManager({ attributes, setAttributes, variantRows,
                         </div>
                     ))}
                 </div>
+
+                {/* Image upload for manual variant */}
+                <div className="mt-3">
+                    <label className={smallLabel} style={{ color: C.textS }}>Variant Image (optional)</label>
+                    <label className="flex items-center gap-3 cursor-pointer rounded-xl overflow-hidden p-2"
+                        style={{ border: `1px dashed ${C.border}`, background: "var(--color-surface-muted)", minHeight: 64 }}>
+                        {draftImagePreview
+                            ? <img src={draftImagePreview} alt="preview" className="flex-shrink-0 object-cover rounded-lg" style={{ width: 56, height: 56 }} />
+                            : <div className="flex-shrink-0 flex items-center justify-center rounded-lg" style={{ width: 56, height: 56, background: C.chip }}><UploadCloud size={20} style={{ color: "var(--color-muted)" }} /></div>
+                        }
+                        <div>
+                            <p className="text-[12px] font-semibold" style={{ color: C.textP }}>Click to upload variant image</p>
+                            <p className="text-[11px]" style={{ color: C.textS }}>JPG, PNG, WEBP · max 5 MB</p>
+                        </div>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => onDraftImage(e.target.files[0])} />
+                    </label>
+                    {draftImagePreview && (
+                        <button type="button" onClick={() => { setDraftImageFile(null); setDraftImagePreview("") }}
+                            className="text-[11px] mt-1" style={{ color: C.redText }}>Remove image</button>
+                    )}
+                </div>
+
                 <button type="button" onClick={addManual} className="mt-3 flex items-center gap-2 px-4 py-2 text-[13px] font-bold rounded-lg"
                     style={{ background: "var(--color-ink)", color: "var(--color-inverse)" }}>
                     <Plus size={14} /> Add variant
@@ -146,7 +182,7 @@ export default function VariantManager({ attributes, setAttributes, variantRows,
                                             <button type="button" aria-label={`Delete variant ${v.name}`} className="p-1 rounded" style={{ color: C.redText }}
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    if (mode === "edit" && v.stockLoaded != null && !window.confirm(`Delete the variant “${v.name}”? Past orders keep their details; the variant disappears from the shop.`)) return
+                                                    if (mode === "edit" && v.stockLoaded != null && !window.confirm(`Delete the variant "${v.name}"? Past orders keep their details; the variant disappears from the shop.`)) return
                                                     setVariantRows((r) => r.filter((_, j) => j !== i))
                                                     if (isEditing) setEditingId(null)
                                                 }}>

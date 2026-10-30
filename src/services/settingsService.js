@@ -153,3 +153,28 @@ export const saveGstSettings = async (settings) => {
         gstEnabled: settings.gstEnabled !== false,
     });
 };
+
+/**
+ * Reads gift wrapping settings from the settings row id='giftWrapSettings'.
+ * Defaults to { giftWrapEnabled: false, giftWrapFree: true, giftWrapCost: 0 }.
+ */
+export const getGiftWrapSettings = async () => {
+    const data = await getSettingsData("giftWrapSettings");
+    if (data) return {
+        giftWrapEnabled: data.giftWrapEnabled === true,
+        giftWrapFree: data.giftWrapFree !== false,
+        giftWrapCost: Number(data.giftWrapCost || 0),
+    };
+    return { giftWrapEnabled: false, giftWrapFree: true, giftWrapCost: 0 };
+};
+
+/**
+ * Saves gift wrapping settings to the settings row id='giftWrapSettings'.
+ */
+export const saveGiftWrapSettings = async (settings) => {
+    await upsertSettingsData("giftWrapSettings", {
+        giftWrapEnabled: settings.giftWrapEnabled === true,
+        giftWrapFree: settings.giftWrapFree !== false,
+        giftWrapCost: Number(settings.giftWrapCost || 0),
+    });
+};

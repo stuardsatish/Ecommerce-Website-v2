@@ -8,7 +8,7 @@ import RequestReasonsCard from "../../features/returns/admin/RequestReasonsCard"
 import {
   CreditCard, Receipt, Loader2, Building, MapPin, Phone, Mail,
   FileText, Globe, Info, Image as ImageIcon, Truck,
-  ShieldCheck, Banknote, Moon, Bell, ChevronDown, ChevronUp
+  ShieldCheck, Banknote, Moon, Bell, ChevronDown, ChevronUp, Gift
 } from "lucide-react"
 
 /* ── Pelago Typography ────────────────────────────────────────────── */
@@ -37,16 +37,16 @@ const Optimization = () => {
     paymentSettings,
     invoiceSettings,
     shippingSettings,
-    gstSettings,
+    giftWrapSettings,
     loading,
     savingPayment,
     savingInvoice,
     savingShipping,
-    savingGst,
+    savingGiftWrap,
     updatePaymentSettings,
     updateInvoiceSettings,
     updateShippingSettings,
-    updateGstSettings,
+    updateGiftWrapSettings,
   } = useSettings()
 
   // Local Form States
@@ -58,8 +58,10 @@ const Optimization = () => {
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(500)
   const [shippingCost, setShippingCost] = useState(49)
 
-  // GST state
-  const [gstEnabled, setGstEnabled] = useState(true)
+  // Gift wrap state
+  const [giftWrapEnabled, setGiftWrapEnabled] = useState(false)
+  const [giftWrapFree, setGiftWrapFree] = useState(true)
+  const [giftWrapCost, setGiftWrapCost] = useState(0)
 
   // Invoice state
   const [companyName, setCompanyName] = useState("")
@@ -90,7 +92,9 @@ const Optimization = () => {
       setFreeShippingThreshold(Number(shippingSettings.freeShippingThreshold ?? 500))
       setShippingCost(Number(shippingSettings.shippingCost ?? 49))
 
-      setGstEnabled(gstSettings.gstEnabled !== false)
+      setGiftWrapEnabled(giftWrapSettings.giftWrapEnabled === true)
+      setGiftWrapFree(giftWrapSettings.giftWrapFree !== false)
+      setGiftWrapCost(Number(giftWrapSettings.giftWrapCost || 0))
 
       setCompanyName(invoiceSettings.companyName || "")
       setAddress(invoiceSettings.address || "")
@@ -106,7 +110,7 @@ const Optimization = () => {
       setUpiId(invoiceSettings.upiId || "")
       setLogo(invoiceSettings.logo || "")
     }
-  }, [loading, paymentSettings, invoiceSettings, shippingSettings, gstSettings])
+  }, [loading, paymentSettings, invoiceSettings, shippingSettings, giftWrapSettings])
 
   // Load live today orders stats
   useEffect(() => {
@@ -158,10 +162,18 @@ const Optimization = () => {
     toast.success("Shipping settings saved successfully!")
   }
 
-  const handleSaveGst = async (e) => {
+  const handleSaveGiftWrap = async (e) => {
     e.preventDefault()
-    await updateGstSettings({ gstEnabled })
-    toast.success("GST settings saved successfully!")
+    const cost = Number(giftWrapCost)
+    if (!giftWrapFree && (isNaN(cost) || cost < 0)) {
+      toast.error("Please enter a valid gift wrapping cost (0 or more).")
+      return
+    }
+    await updateGiftWrapSettings({
+      giftWrapEnabled,
+      giftWrapFree,
+      giftWrapCost: giftWrapFree ? 0 : cost,
+    })
   }
 
   const handleSaveInvoice = async (e) => {
@@ -467,30 +479,30 @@ const Optimization = () => {
         </form>
       </section>
 
-      {/* ── BEGIN: Card3 - GST Settings ── */}
+      {/* ── BEGIN: Card3 - Gift Wrapping Settings ── */}
       <section
         className="bg-white rounded-3xl p-6 md:p-7 border border-[#E2DBD0] shadow-sm"
-        data-purpose="gst-settings-card"
+        data-purpose="gift-wrap-settings-card"
       >
-        <form onSubmit={handleSaveGst}>
+        <form onSubmit={handleSaveGiftWrap}>
           {/* Header */}
           <div className="flex items-start gap-3.5 mb-5">
             <div className="w-9 h-9 rounded-xl bg-[#EAF2ED] text-[#104945] flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5" />
+              <Gift className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-[#14211D]">GST Settings</h3>
+              <h3 className="text-base font-bold text-[#14211D]">Gift Wrapping</h3>
               <p className="text-xs text-[#6A7771] mt-0.5">
-                Control whether GST (Goods & Services Tax) is applied across your store. When disabled, prices are treated as final — no tax breakdown appears anywhere (invoices, cart, order details).
+                Allow customers to add gift wrapping to their order. You can offer it free or charge a flat fee.
               </p>
             </div>
           </div>
 
-          {/* Status Toggle Banner */}
+          {/* Enable / Disable Toggle Banner */}
           <div
-            onClick={() => setGstEnabled(!gstEnabled)}
+            onClick={() => setGiftWrapEnabled(!giftWrapEnabled)}
             className={`flex items-center justify-between p-3.5 rounded-2xl mb-5 border transition-all cursor-pointer select-none ${
-              gstEnabled
+              giftWrapEnabled
                 ? "bg-[#ECFDF5] border-[#A7F3D0]"
                 : "bg-[#FBF9F6] border-[#E5DFD4]"
             }`}
@@ -498,39 +510,34 @@ const Optimization = () => {
             <div className="flex items-center gap-3">
               <div
                 className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                  gstEnabled
+                  giftWrapEnabled
                     ? "bg-[#D1FAE5] text-[#065F46]"
                     : "bg-gray-100 text-gray-400"
                 }`}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"></path>
-                </svg>
+                <Gift className="w-4 h-4" />
               </div>
               <div>
-                <p className={`text-xs font-bold ${gstEnabled ? "text-[#064E3B]" : "text-gray-800"}`}>
-                  GST is currently{" "}
-                  <span className={gstEnabled ? "text-[#059669]" : "text-gray-500"}>
-                    {gstEnabled ? "Enabled" : "Disabled"}
+                <p className={`text-xs font-bold ${giftWrapEnabled ? "text-[#064E3B]" : "text-gray-800"}`}>
+                  Gift wrapping is currently{" "}
+                  <span className={giftWrapEnabled ? "text-[#059669]" : "text-gray-500"}>
+                    {giftWrapEnabled ? "Enabled" : "Disabled"}
                   </span>
                 </p>
-                <p className={`text-[11px] ${gstEnabled ? "text-[#047857]" : "text-gray-500"}`}>
-                  {gstEnabled
-                    ? "Tax is computed per product and shown in invoices, cart and order details."
-                    : "GST is ignored. Product price = final price. No tax details anywhere."}
+                <p className={`text-[11px] ${giftWrapEnabled ? "text-[#047857]" : "text-gray-500"}`}>
+                  {giftWrapEnabled
+                    ? "Customers can choose gift wrapping at checkout."
+                    : "Gift wrapping option is hidden from customers."}
                 </p>
               </div>
             </div>
 
             {/* Active Switch Toggle */}
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setGstEnabled(!gstEnabled)
-              }}
-              aria-label="Toggle GST"
+              onClick={(e) => { e.stopPropagation(); setGiftWrapEnabled(!giftWrapEnabled) }}
+              aria-label="Toggle Gift Wrapping"
               className={`w-11 h-6 rounded-full p-0.5 flex items-center transition-colors cursor-pointer ${
-                gstEnabled ? "bg-[#104945] justify-end" : "bg-gray-300 justify-start"
+                giftWrapEnabled ? "bg-[#104945] justify-end" : "bg-gray-300 justify-start"
               }`}
               type="button"
             >
@@ -538,57 +545,112 @@ const Optimization = () => {
             </button>
           </div>
 
-          {/* Comparison Boxes: GST ON vs OFF */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Box: When GST is ON */}
-            <div
-              className={`p-4 rounded-2xl border transition-all ${
-                gstEnabled
-                  ? "border-[#D1FAE5] bg-[#F7FCF9]"
-                  : "border-[#E5DFD4] bg-[#FBF9F6] opacity-70"
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-2.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <h5 className="text-xs font-bold text-[#1B382B]">When GST is ON</h5>
-              </div>
-              <ul className="text-[11px] text-[#4A5D54] space-y-1.5 list-disc list-inside">
-                <li>Tax breakdown in invoices (CGST / SGST / IGST)</li>
-                <li>&ldquo;Tax included in price&rdquo; shown in cart</li>
-                <li>Taxable value & GST amounts shown in order details</li>
-                <li>HSN codes & GST% columns in invoice PDF</li>
-              </ul>
-            </div>
+          {/* Pricing Options — only shown when gift wrap is enabled */}
+          {giftWrapEnabled && (
+            <div className="space-y-4 mb-6">
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#8F9A95]">Pricing</h4>
 
-            {/* Box: When GST is OFF */}
-            <div
-              className={`p-4 rounded-2xl border transition-all ${
-                !gstEnabled
-                  ? "border-[#F8B4B4] bg-[#FEE2E2]/30"
-                  : "border-[#E5DFD4] bg-[#FBF9F6] opacity-70"
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-2.5">
-                <span className="w-2 h-2 rounded-full bg-gray-400"></span>
-                <h5 className="text-xs font-bold text-[#3E4A45]">When GST is OFF</h5>
+              {/* Free vs Paid toggle cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Free option */}
+                <div
+                  onClick={() => setGiftWrapFree(true)}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all select-none ${
+                    giftWrapFree
+                      ? "border-[#104945] bg-[#EAF4F2]"
+                      : "border-[#DFE7E2] bg-[#FAFCFB] hover:border-[#104945]"
+                  }`}
+                >
+                  <div className="pt-0.5">
+                    <input
+                      checked={giftWrapFree}
+                      readOnly
+                      type="radio"
+                      className="w-4 h-4 text-[#104945] focus:ring-0 cursor-pointer accent-[#104945]"
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[#182622]">Free Gift Wrapping</span>
+                      <span className="text-[10px] bg-[#D1FAE5] text-[#065F46] px-1.5 py-0.5 rounded font-bold">FREE</span>
+                    </div>
+                    <p className="text-[11px] text-[#717E79]">Customers see "Gift wrapping is free" at checkout.</p>
+                  </div>
+                </div>
+
+                {/* Paid option */}
+                <div
+                  onClick={() => setGiftWrapFree(false)}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all select-none ${
+                    !giftWrapFree
+                      ? "border-[#104945] bg-[#EAF4F2]"
+                      : "border-[#DFE7E2] bg-[#FAFCFB] hover:border-[#104945]"
+                  }`}
+                >
+                  <div className="pt-0.5">
+                    <input
+                      checked={!giftWrapFree}
+                      readOnly
+                      type="radio"
+                      className="w-4 h-4 text-[#104945] focus:ring-0 cursor-pointer accent-[#104945]"
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-[#182622]">Paid Gift Wrapping</span>
+                    <p className="text-[11px] text-[#717E79]">Charge a flat fee added to the cart total.</p>
+                  </div>
+                </div>
               </div>
-              <ul className="text-[11px] text-[#63726B] space-y-1.5 list-disc list-inside">
-                <li>Product price = total price, GST fields ignored</li>
-                <li>No tax row in cart or order summary</li>
-                <li>Invoice PDF shows simple price table only</li>
-                <li>No CGST / SGST / IGST stored on new orders</li>
-              </ul>
+
+              {/* Cost input — only visible when paid is selected */}
+              {!giftWrapFree && (
+                <div className="max-w-xs">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#697670] mb-1.5">
+                    Gift Wrapping Cost (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs text-gray-500 font-medium">₹</span>
+                    <input
+                      className="w-full pl-7 pr-3 py-2 text-xs rounded-xl border border-[#D5CEBF] bg-[#FDFBF9] text-[#1D2B26] focus:border-[#104945] focus:ring-1 focus:ring-[#104945] outline-none"
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      placeholder="e.g. 49"
+                      value={giftWrapCost}
+                      onChange={(e) => setGiftWrapCost(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-[11px] text-[#7A8681] mt-1">
+                    This amount will appear as "Gift Wrapping" in the customer's cart summary.
+                  </p>
+                </div>
+              )}
+
+              {/* Preview Banner */}
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] text-xs text-[#166534]">
+                <Gift className="w-4 h-4 shrink-0 text-[#16A34A]" />
+                <span>
+                  Customers will see:{" "}
+                  <strong>
+                    {giftWrapFree
+                      ? "🎁 Gift Wrapping — Free"
+                      : `🎁 Gift Wrapping — ₹${giftWrapCost || 0}`}
+                  </strong>{" "}
+                  in their cart.
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Action Button */}
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={savingGst}
+              disabled={savingGiftWrap}
               className="inline-flex items-center gap-2 bg-[#1B4332] hover:bg-[#123023] text-white px-4 py-2 rounded-xl text-xs font-medium shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
-              {savingGst ? (
+              {savingGiftWrap ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   <span>Saving...</span>
@@ -598,7 +660,7 @@ const Optimization = () => {
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" strokeLinecap="round" strokeLinejoin="round"></path>
                   </svg>
-                  <span>Save GST Settings</span>
+                  <span>Save Gift Wrapping Settings</span>
                 </>
               )}
             </button>
@@ -861,7 +923,7 @@ const Optimization = () => {
         >
           <div className="flex items-center gap-2.5">
             <ShieldCheck className="w-4 h-4 text-[#104945]" />
-            <span>Advanced Policies, Couriers & Return Reasons</span>
+            <span>Advanced Policies, Couriers &amp; Return Reasons</span>
           </div>
           {showAdvancedPolicies ? (
             <ChevronUp className="w-4 h-4 text-gray-500" />

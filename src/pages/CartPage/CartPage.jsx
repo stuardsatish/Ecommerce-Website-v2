@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -76,6 +76,8 @@ const CartPage = () => {
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [gstEnabled, setGstEnabled] = useState(true);
+  // Gift wrap admin settings (loaded from Supabase giftWrapSettings row)
+  const [giftWrapConfig, setGiftWrapConfig] = useState({ giftWrapEnabled: false, giftWrapFree: true, giftWrapCost: 0 });
 
   useEffect(() => {
     let active = true;
@@ -84,7 +86,7 @@ const CartPage = () => {
         const { data: rows, error } = await supabase
           .from("settings")
           .select("id, data")
-          .in("id", ["paymentSettings", "shippingSettings", "gstSettings"]);
+          .in("id", ["paymentSettings", "shippingSettings", "gstSettings", "giftWrapSettings"]);
         if (error) throw error;
         const byId = {};
         (rows || []).forEach((r) => { byId[r.id] = r.data || {}; });
@@ -104,6 +106,10 @@ const CartPage = () => {
           const gd = byId.gstSettings;
           if (gd) {
             setGstEnabled(gd.gstEnabled !== false);
+          }
+          const gwd = byId.giftWrapSettings;
+          if (gwd) {
+            setGiftWrapConfig({ giftWrapEnabled: gwd.giftWrapEnabled === true, giftWrapFree: gwd.giftWrapFree !== false, giftWrapCost: Number(gwd.giftWrapCost || 0) });
           }
         }
       } catch (error) {
@@ -216,12 +222,14 @@ const CartPage = () => {
   }
 
   const shippingEstimate = subtotal >= shippingConfig.freeShippingThreshold ? 0 : shippingConfig.shippingCost;
+  // Gift wrap charge: 0 if not enabled, 0 if free, or the configured cost
+  const giftWrapCharge = (giftWrap && giftWrapConfig.giftWrapEnabled && !giftWrapConfig.giftWrapFree) ? Number(giftWrapConfig.giftWrapCost || 0) : 0;
   // Mirror the server's rounding in functions/routes/payment.js exactly (round the
   // subtotal to whole rupees BEFORE adding shipping/promo) — otherwise this total
   // can show paise the server never charges, since Razorpay is always billed a
   // rounded whole-rupee amount.
   const subtotalRounded = Math.round(subtotal);
-  const orderTotal = Math.max(0, Math.round(subtotalRounded + shippingEstimate - promoDiscount));
+  const orderTotal = Math.max(0, Math.round(subtotalRounded + shippingEstimate + giftWrapCharge - promoDiscount));
   useEffect(() => {
     let active = true;
     (async () => {
@@ -254,7 +262,7 @@ const CartPage = () => {
 
   // Phase 5A: Load saved items + coupons on mount
   useEffect(() => {
-    listSavedItems().then(setSavedItems).catch(() => {});
+    listSavedItems().then(setSavedItems).catch(() => { });
     listAvailableCoupons()
       .then((list) => { setCoupons(list); setCouponsLoaded(true); })
       .catch(() => setCouponsLoaded(true));
@@ -301,7 +309,7 @@ const CartPage = () => {
         });
         setPriceChanges(changes);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -448,7 +456,7 @@ const CartPage = () => {
 
             // Gift wrap: write to order row (fire-and-forget, safe if giftWrap is false)
             if (verifyResult?.orderId && (giftWrap || giftMessage.trim())) {
-              supabase.from("orders").update({ gift_wrap: giftWrap, gift_message: giftMessage.trim() }).eq("id", verifyResult.orderId).then(() => {}).catch(() => {});
+              supabase.from("orders").update({ gift_wrap: giftWrap, gift_message: giftMessage.trim() }).eq("id", verifyResult.orderId).then(() => { }).catch(() => { });
             }
             dispatch(clearCart());
             toast.success("Payment successful — order placed ", {
@@ -555,7 +563,7 @@ const CartPage = () => {
               discount: ch.liveDiscount, discountExpiry: ch.liveExpiry,
             }, item.quantity);
           })
-      ).catch(() => {});
+      ).catch(() => { });
     }
     setAcknowledgedChanges(true);
     setPriceChanges({});
@@ -1205,12 +1213,13 @@ Thank you.`;
                 </div>
               )}
 
-              {/* Gift wrap (Phase 5.11) */}
+              {/* Gift wrap (Phase 5.11) — only shown when admin enables gift wrap */}
+              {giftWrapConfig.giftWrapEnabled && (
               <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "12px", padding: "14px 16px", marginTop: "14px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <p style={{ fontWeight: 600, fontSize: "14px", color: "var(--color-ink)" }}> Gift wrap this order</p>
-                    <p style={{ fontSize: "11px", color: "var(--color-muted)", marginTop: "2px" }}>We'll wrap your items beautifully</p>
+                    <p style={{ fontSize: "11px", color: "var(--color-muted)", marginTop: "2px" }}>{giftWrapConfig.giftWrapFree ? "🎁 Gift wrapping is free!" : `🎁 Add gift wrapping for ₹${giftWrapConfig.giftWrapCost}`}</p>
                   </div>
                   <button
                     onClick={() => setGiftWrap(v => !v)}
@@ -1229,11 +1238,13 @@ Thank you.`;
                       placeholder="Add a personal message (optional)"
                       rows={3}
                       style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-border)", background: "var(--color-surface-muted)", color: "var(--color-ink)", fontSize: "13px", resize: "none", fontFamily: "inherit" }}
-                     />
+                    />
                     <p style={{ textAlign: "right", fontSize: "11px", color: "var(--color-muted)", marginTop: "4px" }}>{giftMessage.length}/200</p>
                   </div>
                 )}
               </div>
+
+              )}
 
               {/* Cross-sell shelf (Phase 5.7) */}
               {suggestionList.length > 0 && (
@@ -1361,7 +1372,7 @@ Thank you.`;
           gap: "40px",
         }}
       >
-        
+
         {/* Phase 8.2: guest upgrade banner */}
         {user?.is_anonymous && (
           <div
@@ -1765,6 +1776,15 @@ Thank you.`;
                         {money(shippingEstimate)}
                       </span>
                     </div>
+                    {/* Gift wrap charge row — shown only when admin enabled + user toggled on */}
+                    {giftWrapConfig.giftWrapEnabled && giftWrap && (
+                      <div className="flex" style={{ justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--color-body)" }}>🎁 Gift Wrapping</span>
+                        <span style={{ fontWeight: 700, color: giftWrapConfig.giftWrapFree ? "var(--color-success)" : "var(--color-ink)" }}>
+                          {giftWrapConfig.giftWrapFree ? "Free" : money(giftWrapConfig.giftWrapCost)}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex" style={{ justifyContent: "space-between" }}>
                       <span style={{ color: "var(--color-body)" }}>Tax</span>
                       <span style={{ fontWeight: 500, color: "var(--color-muted)", fontSize: "13px" }}>Included in price (GST)</span>
@@ -1878,12 +1898,13 @@ Thank you.`;
                     </div>
                   )}
 
-                  {/* Gift wrap (Phase 5.11) */}
+                  {/* Gift wrap (Phase 5.11) — only shown when admin enables gift wrap */}
+                  {giftWrapConfig.giftWrapEnabled && (
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingBottom: "4px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <p style={{ fontWeight: 600, fontSize: "14px", color: "var(--color-ink)" }}> Gift wrap</p>
-                        <p style={{ fontSize: "12px", color: "var(--color-muted)" }}>We'll wrap your items beautifully</p>
+                        <p style={{ fontSize: "12px", color: "var(--color-muted)" }}>{giftWrapConfig.giftWrapFree ? "🎁 Gift wrapping is free!" : `🎁 Add gift wrapping for ₹${giftWrapConfig.giftWrapCost}`}</p>
                       </div>
                       <button
                         onClick={() => setGiftWrap(v => !v)}
@@ -1900,6 +1921,8 @@ Thank you.`;
                       </div>
                     )}
                   </div>
+
+                  )}
 
                   {/* CHECKOUT */}
                   {isCheckoutDisabled ? (

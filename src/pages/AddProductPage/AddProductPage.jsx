@@ -1203,12 +1203,21 @@ const AddProductPage = ({
                                         >
                                             <Pencil size={13} />
                                         </button>
+                                        {/* Delete button */}
+                                        <button
+                                            onClick={() => deleteProduct(p.id, p.productId)}
+                                            className="p-1 text-[#BE413B] hover:text-white hover:bg-[#BE413B] rounded transition-colors"
+                                            title="Delete Product"
+                                            type="button"
+                                        >
+                                            <Trash2 size={13} />
+                                        </button>
                                         {/* Status Switch */}
                                         <div
                                             onClick={() => toggleProductStatus(p)}
                                             className={`w-7 h-3.5 rounded-full p-0.5 flex items-center cursor-pointer transition-colors ${p.status !== "draft" ? "bg-[#115E59] justify-end" : "bg-stone-300 justify-start"
                                                 }`}
-                                            title={p.status !== "draft" ? "Active (click to draft)" : "Draft (click to activate)"}
+                                            title={p.status !== "draft" ? "Active — visible to customers (click to hide)" : "Draft — hidden from customers (click to show)"}
                                         >
                                             <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm" />
                                         </div>

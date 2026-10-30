@@ -19,11 +19,18 @@ import { mapProductRows } from "../utils/supabaseProducts"
  *
  * `rpcUnavailable` is latched after the first failure so a missing function
  * costs one round trip per page load rather than one per keystroke.
+ *
+ * Draft filtering: draft products are excluded at both the SQL level
+ * (search_products RPC has WHERE p.status != 'draft') AND here in JS
+ * as a safety net in case the DB function is an older version.
  */
 
 let rpcUnavailable = false
 
 const MIN_QUERY_LENGTH = 2
+
+/** Returns true if a (mapped or raw) product is NOT a draft. */
+const isNotDraft = (p) => p.status !== "draft"
 
 /** Local fallback: the same title/brand/category substring match, client-side. */
 const localSearch = (query, catalog, limit) => {
@@ -31,6 +38,7 @@ const localSearch = (query, catalog, limit) => {
     if (needle.length < MIN_QUERY_LENGTH) return []
     return catalog
         .filter((p) => {
+            if (!isNotDraft(p)) return false
             const title = String(p.title || p.name || "").toLowerCase()
             const brand = String(p.brand || "").toLowerCase()
             const category = String(p.category || "").toLowerCase()
@@ -63,7 +71,12 @@ export const searchProducts = async (query, { catalog = [], limit = 20 } = {}) =
                 limit_count: limit,
             })
             if (error) throw error
-            return { results: mapProductRows(data || []), typoTolerant: true }
+            // Filter drafts on raw rows first (in case DB function is old version
+            // without WHERE status != 'draft'), then map, then filter again on
+            // mapped rows (mapProductRow defaults undefined status to "active" so
+            // the second filter catches any edge cases the first missed).
+            const mapped = mapProductRows((data || []).filter(isNotDraft))
+            return { results: mapped.filter(isNotDraft), typoTolerant: true }
         } catch (err) {
             // PGRST202 = function not found in the schema cache, i.e. the
             // migration hasn't been applied yet. Anything else (network, RLS)
